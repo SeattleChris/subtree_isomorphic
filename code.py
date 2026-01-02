@@ -247,10 +247,10 @@ def jennysSubtrees(n, r, edges):
     print(f"Label Errors: {total=} {oc} {mm} {nl}")
     for root, centers, paths in OVERCENTER:
         print(f"{root=} {centers} {paths}")
-    # for tree, members in NOLABEL:
-    #     print(f"{members=} {tree}")
-    # for tree, mismatch in MISMATCH:
-    #     print(f"{mismatch=} {tree}")
+    for tree, members in NOLABEL:
+        print(f"{members=} {tree}")
+    for tree, missing in MISMATCH:
+        print(f"{missing=} {tree}")
     return len(uniq)
 
 if __name__ == '__main__':
