@@ -130,7 +130,6 @@ class Tree:
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
         _centers = tuple(c for ahu, c in ahu_centers)
         _labels = tuple(ahu for ahu, c in ahu_centers)
-        _centers = tuple(c for ahu, c in ahu_centers)
         if len(_centers) > 2:
             paths = self.center_connections(set(_centers), False)
             OVERCENTER.add((self.index, _centers, paths))
