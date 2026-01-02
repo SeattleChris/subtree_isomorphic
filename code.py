@@ -30,7 +30,7 @@ class Tree:
         if hasattr(cls, 'graph') or not adjacency:
             return None
         cls.graph = list(adjacency)
-        cls.PATHS = {}
+        cls.PATHS: dict[tuple[int, int], list[int]] = {}
         # parent, child = None, None
         # for idx, children in enumerate(cls.graph):
         #     if len(children) == 1:
@@ -112,7 +112,7 @@ class Tree:
             print(f"Prune Paths: {paths} for centers {tuple(mids)}")
         return paths
 
-    def get_center_labels(self) -> (tuple[int], tuple[str]):
+    def prune_for_centers(self) -> (tuple[int], tuple[str]):
         """Using the pruning method to find centers and labels."""
         visited = curr = self.leafs
         nxt = set(p for c in curr for p in (self.graph[c] & self.members) - visited)
@@ -136,7 +136,7 @@ class Tree:
             OVERCENTER.add((self.index, _centers, paths))
         return [_centers, _labels]
 
-    def path_centers(self) -> (tuple[int], tuple[str]):
+    def all_path_centers(self) -> (tuple[int], tuple[str]):
         paths = self.get_paths(self.leafs)
         size = max(len(p) for p in paths)
         end = 1 + size // 2
@@ -147,7 +147,6 @@ class Tree:
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
         _centers = tuple(c for ahu, c in ahu_centers)
         _labels = tuple(ahu for ahu, c in ahu_centers)
-        _centers = tuple(c for ahu, c in ahu_centers)
         if len(_centers) > 2:
             def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
             OVERCENTER.add((
@@ -160,13 +159,17 @@ class Tree:
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
-            self._centers, self._labels = self.get_center_labels()
+            self._centers, self._labels = self.prune_for_centers()
+            # self._centers, self._labels = self.all_path_centers()
+            # self._centers, self._labels = self.diameter_centers()
         return self._centers
 
     @property
     def labels(self) -> tuple[str]:
         if not self._labels:
-            self._centers, self._labels = self.get_center_labels()
+            self._centers, self._labels = self.prune_for_centers()
+            # self._centers, self._labels = self.all_path_centers()
+            # self._centers, self._labels = self.diameter_centers()
         return self._labels
 
     def build(self, root: int) -> set[int]:
