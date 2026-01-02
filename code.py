@@ -208,7 +208,7 @@ class Tree:
 
 def jennysSubtrees(n, r, edges):
     """
-    Pass tests 0-12; Fail on test 21; Timeout on 7 remaining of 22 tests.
+    Pass tests 0-12, 18; Fail test 21; Timeout but correct Correct on 17. Timeout on 6 remaining of 22 tests.
     Previously had error on tests 16, 19, 20, 21.
     Had phantom success on tests 14 and 17 on very old version.
     """
