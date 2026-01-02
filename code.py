@@ -79,12 +79,12 @@ class Tree:
         paths = (self._get_path(a, b, starts[a], allowed) for a, b in combinations(starts, 2))
         return list(filter(None, paths))
 
-    def ahu_height(self, curr, parent) -> tuple[str, int]:
+    def ahu_height(self, curr, parent) -> tuple[str, int, int]:
         children = self.graph[curr] & self.members - {parent, }
         if not children:
-            return '10', 1
+            return '10', 1, curr
         heights = sorted(self.ahu_height(child, curr) for child in children)
-        return '1' + ''.join(s for s, h in heights) + '0', max(h for s, h in heights) + 1
+        return '1' + ''.join(s for s, h, c in heights) + '0', max(h for s, h, c in heights) + 1, curr
 
     @property
     def degree(self) -> dict[int: int]:
@@ -124,10 +124,11 @@ class Tree:
                 for p in self.graph[c] & self.members - visited
                 if len(self.graph[p] & self.members - visited) == 1
                 )
-        # self.center_connections(children, True)
-        ah_mids = [(self.ahu_height(mid, None), mid) for mid in children]
-        lo = min(ah[1] for ah, c in ah_mids)
-        ahu_centers = sorted((ah[0], c) for ah, c in ah_mids if ah[1] == lo)
+        # self.center_connections(curr, True)
+        ah_mids = [self.ahu_height(mid, None) for mid in curr]
+        lo = min(h for a, h, m in ah_mids)
+        ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
+        _centers = tuple(c for ahu, c in ahu_centers)
         _labels = tuple(ahu for ahu, c in ahu_centers)
         _centers = tuple(c for ahu, c in ahu_centers)
         if len(_centers) > 2:
