@@ -166,8 +166,7 @@ class Tree:
             visited.update(curr)
             nxt = set(d for c in curr for d in self.graph[c] & self.members)
             dist += 1
-        if len(last) > 1:
-            print(f"Multiple furthest leafs from {start}: {last}")
+        # There can be multiple furthest leafs in case of ties any arbitrary one will do
         return last.pop(), dist, visited
 
     def diameter_centers(self) -> (tuple[int], tuple[str]):
