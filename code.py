@@ -87,7 +87,7 @@ class Tree:
         return '1' + ''.join(s for s, h, c in heights) + '0', max(h for s, h, c in heights) + 1, curr
 
     @property
-    def degree(self) -> dict[int: int]:
+    def degree(self) -> dict:
         if not self._degree:
             degree = defaultdict(set)
             for d in self.members:
@@ -97,7 +97,7 @@ class Tree:
         return self._degree
 
     @property
-    def leafs(self):
+    def leafs(self) -> set[int]:
         return self.degree[1]
 
     def center_connections(self, mids: set[int], display: bool = False) -> tuple[tuple[int]]:
@@ -113,16 +113,16 @@ class Tree:
 
     def get_center_labels(self) -> (tuple[int], tuple[str]):
         """Using the pruning method to find centers and labels."""
-        visited = children = set(self.leafs)
-        parents = set(p for c in children for p in self.graph[c] & self.members - visited)
-        while parents:
-            children = parents
-            visited |= children
-            parents = set(
-                p
-                for c in children
-                for p in self.graph[c] & self.members - visited
-                if len(self.graph[p] & self.members - visited) == 1
+        visited = curr = self.leafs
+        nxt = set(p for c in curr for p in self.graph[c] & self.members - visited)
+        while nxt:
+            curr = nxt
+            visited |= curr
+            nxt = set(
+                x
+                for c in curr
+                for x in self.graph[c] & self.members - visited
+                if len(self.graph[x] & self.members - visited) == 1
                 )
         # self.center_connections(curr, True)
         ah_mids = [self.ahu_height(mid, None) for mid in curr]
