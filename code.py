@@ -140,12 +140,8 @@ class Tree:
         size = max(len(p) for p in paths)
         end = 1 + size // 2
         beg = end - 2 + size % 2
-        ah_mids = [
-            self.ahu_height(mid, None)
-            for p in paths
-            for mid in p[beg:end]
-            if len(p) == size
-            ]
+        mids = set(d for p in paths for d in p[beg:end] if len(p) == size)
+        ah_mids = [self.ahu_height(mid, None) for mid in mids]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
         _centers = tuple(c for ahu, c in ahu_centers)
