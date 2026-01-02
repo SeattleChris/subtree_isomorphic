@@ -70,8 +70,14 @@ class Tree:
         cls.PATHS[(end, curr)] = None
         return None
 
-    def get_path(self, curr, end) -> list[int]:
-        return self._get_path(curr, end, None, self.members) or []
+    def get_paths(self, ends: set[int]) -> list[int]:
+        if self.radius == 0:
+            return [[self.index], ]
+        allowed = self.members - ends
+        starts = {start: e for e in ends for start in self.graph[e] & allowed}
+        # overwrite of earlier start: leaf pair is acceptable; All leafs excluded from allowed
+        paths = (self._get_path(a, b, starts[a], allowed) for a, b in combinations(starts, 2))
+        return list(filter(None, paths))
 
     def ahu_height(self, curr, parent) -> tuple[str, int]:
         children = self.graph[curr] & self.members - {parent, }
@@ -94,70 +100,74 @@ class Tree:
     def leafs(self):
         return self.degree[1]
 
-    @property
-    def prune_centers(self) -> tuple[int]:
-        if not self._centers:
-            visited = children = set(self.leafs)
-            parents = set(p for c in children for p in self.graph[c] & self.members - visited)
-            paths = []
-            while parents:
-                paths.append(tuple(parents))
-                children = parents
-                visited |= children
-                parents = set(
-                    p
-                    for c in children
-                    for p in self.graph[c] & self.members - visited
-                    if len(self.graph[p] & self.members - visited) == 1
-                    )
-            ah_mids = [(self.ahu_height(mid, None), mid) for mid in children]
-            lo = min(ah[1] for ah, c in ah_mids)
-            ahu_centers = sorted((ah[0], c) for ah, c in ah_mids if ah[1] == lo)
-            labels = tuple(ahu for ahu, c in ahu_centers)
-            self._labels = labels
-            self._centers = tuple(c for ahu, c in ahu_centers)
-            if len(self._centers) > 2:
-                OVERCENTER.add((self.index, self._centers, tuple(paths[-3:])))
-        return self._centers
+    def center_connections(self, centers: set[int], display: bool = False) -> tuple[int]:
+        if len(centers) < 2:
+            return tuple()
+        adjacent = (self._get_path(a, b, None, centers) for a, b in combinations(centers, 2))
+        paths = tuple(self.get_paths(centers) + list(filter(None, adjacent)))
+        if len(paths) == 1 and set(paths[0]) == centers:
+            return tuple()
+        if display:
+            print(f"Prune Paths: {paths} for centers {tuple(centers)}")
+        return paths
 
-    @property
-    def path_centers(self) -> tuple[int]:
-        if not self._centers:
-            paths = [self.get_path(a, b) for a, b in combinations(self.leafs, 2)]
-            size = max(len(p) for p in paths)
-            end = 1 + size // 2
-            width = 2 - size % 2
-            beg = end - width
-            # mids = (d for p in paths for d in p[beg:end] if len(p) == size)
-            # ah_mids = [(self.ahu_height(mid, None), mid) for mid in mids]
-            ah_mids = [
-                (self.ahu_height(mid, None), mid)
-                for path in paths
-                for mid in path[beg:end]
-                if len(path) == size
-                ]
-            lo = min(ah[1] for ah, c in ah_mids)
-            ahu_centers = sorted((ah[0], c) for ah, c in ah_mids if ah[1] == lo)
-            labels = tuple(ahu for ahu, c in ahu_centers)
-            self._labels = labels
-            self._centers = tuple(c for ahu, c in ahu_centers)
-            if len(self._centers) > 2:
-                OVERCENTER.add((
-                    self.index,
-                    tuple(self._centers),
-                    tuple(tuple(p[:2] + p[beg-1:end+1] + p[-2:]) for p in paths if len(p) == size)
-                    ))
-        return self._centers
+    def prune_centers(self) -> (tuple[int], tuple[str]):
+        visited = children = set(self.leafs)
+        parents = set(p for c in children for p in self.graph[c] & self.members - visited)
+        while parents:
+            children = parents
+            visited |= children
+            parents = set(
+                p
+                for c in children
+                for p in self.graph[c] & self.members - visited
+                if len(self.graph[p] & self.members - visited) == 1
+                )
+        # self.display_center_paths(children, True)
+        ah_mids = [(self.ahu_height(mid, None), mid) for mid in children]
+        lo = min(ah[1] for ah, c in ah_mids)
+        ahu_centers = sorted((ah[0], c) for ah, c in ah_mids if ah[1] == lo)
+        _labels = tuple(ahu for ahu, c in ahu_centers)
+        _centers = tuple(c for ahu, c in ahu_centers)
+        if len(_centers) > 2:
+            paths = self.center_connections(set(_centers), False)
+            OVERCENTER.add((self.index, _centers, paths))
+        return [_centers, _labels]
+
+    def path_centers(self) -> (tuple[int], tuple[str]):
+        paths = self.get_paths(self.leafs)
+        size = max(len(p) for p in paths)
+        end = 1 + size // 2
+        beg = end - 2 + size % 2
+        mids = set(d for p in paths for d in p[beg:end] if len(p) == size)
+        ah_mids = [(self.ahu_height(mid, None), mid) for mid in mids]
+        lo = min(ah[1] for ah, c in ah_mids)
+        ahu_centers = sorted((ah[0], c) for ah, c in ah_mids if ah[1] == lo)
+        _labels = tuple(ahu for ahu, c in ahu_centers)
+        _centers = tuple(c for ahu, c in ahu_centers)
+        if len(_centers) > 2:
+            def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
+            OVERCENTER.add((
+                self.index,
+                tuple(_centers),
+                tuple(_summary(p) for p in paths if len(p) == size)
+                ))
+        return [_centers, _labels]
+
+    def get_center_labels(self) -> tuple[int]:
+        # return self.path_centers()
+        return self.prune_centers()
 
     @property
     def centers(self) -> tuple[int]:
-        # return self.path_centers
-        return self.prune_centers
+        if not self._centers:
+            self._centers, self._labels = self.get_center_labels()
+        return self._centers
 
     @property
     def labels(self) -> tuple[str]:
         if not self._labels:
-            self.centers
+            self._centers, self._labels = self.get_center_labels()
         return self._labels
 
     def build(self, root: int) -> set[int]:
@@ -237,10 +247,10 @@ def jennysSubtrees(n, r, edges):
     print(f"Label Errors: {total=} {oc} {mm} {nl}")
     for root, centers, paths in OVERCENTER:
         print(f"{root=} {centers} {paths}")
-    # for tree, members in NOLABEL:
-    #     print(f"{members=} {tree}")
-    # for tree, mismatch in MISMATCH:
-    #     print(f"{mismatch=} {tree}")
+    for tree, members in NOLABEL:
+        print(f"{members=} {tree}")
+    for tree, missing in MISMATCH:
+        print(f"{missing=} {tree}")
     return len(uniq)
 
 if __name__ == '__main__':
