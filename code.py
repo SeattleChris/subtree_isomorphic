@@ -19,7 +19,8 @@ class Tree:
         self.radius: int = radius
         if not hasattr(self, 'graph'):
             self.set_graph(adjacency)
-        self.members = self.build(root)
+        self.members, self.far = self.build(root)
+        self.dead: set[tuple[int, int]] = set()
         self._degree: dict[int, int] = None
         self._centers: tuple[int] = None
         self._labels: tuple[str] = None
@@ -170,13 +171,14 @@ class Tree:
 
     def build(self, root: int) -> set[int]:
         visited = set()
-        nxt = {root, }
+        nxt = furthest = {root, }
         dist = -1
         while (curr := nxt - visited) and dist < self.radius:
+            furthest = curr
             visited.update(curr)
             nxt = set(d for c in curr for d in self.graph[c])
             dist += 1
-        return visited
+        return visited, furthest
 
     def __eq__(self, other):
         if not isinstance(other, Tree):
