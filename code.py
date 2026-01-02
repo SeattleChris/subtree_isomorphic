@@ -36,7 +36,7 @@ class Tree:
         #         parent = idx
         #         child = tuple(children)[-1]
         #         break
-        # errors = cls.travel(child, parent, set((parent,)))
+        # errors = cls.find_loop(child, parent, set((parent,)))
         # if errors:
         #     print(f"Loops at {errors}")
         # else:
@@ -44,13 +44,13 @@ class Tree:
 
 
     @classmethod
-    def travel(cls, curr, parent, visited):
+    def find_loop(cls, curr, parent, visited):
         if curr in visited:
             return [curr]
         visited.add(curr)
         children = cls.graph[curr] - {parent, }
         if children:
-            return sum((cls.travel(child, curr, visited) for child in children), [])
+            return sum((cls.find_loop(child, curr, visited) for child in children), [])
         return []
 
     @classmethod
@@ -162,48 +162,38 @@ class Tree:
 
     def build(self, root: int) -> set[int]:
         visited = set()
-        pre = {root, }
+        nxt = {root, }
         dist = -1
-        while pre and dist < self.radius:
-            visited.update(curr := pre - visited)
-            pre = set(d for c in curr for d in self.graph[c])
+        while (curr := nxt - visited) and dist < self.radius:
+            visited.update(curr)
+            nxt = set(d for c in curr for d in self.graph[c])
             dist += 1
         return visited
 
     def __eq__(self, other):
         if not isinstance(other, Tree):
             return NotImplemented
-        # slf_txt = f"Self#{self.index}:{len(self.members)}"
-        # oth_txt = f"Other#{other.index}:{len(other.members)}"
-        # txt_same = f"SAME: {slf_txt} {oth_txt}"
         if None in (self._labels, other._labels):
             if len(self.members) != len(other.members):
-                # print(f"members NOT {txt_same}")
                 return False
             if self.degree['size'] != other.degree['size']:
-                # print(f"degree NOT {txt_same}")
                 return False
-            # if self.centers == other.centers:
-            #     return True
         for desc in self.labels:
             if desc in other.labels:
                 return True
         if not self._labels:
             NOLABEL.add((str(self), len(self.members)))
-        elif (slb := len(self.members) - len(self.labels[0]) // 2):
+        elif (slb := len(self.members) - (len(self.labels[0]) // 2)):
             MISMATCH.add((str(self), slb))
         if not other._labels:
             NOLABEL.add((str(other), len(other.members)))
-            # print(f"No labels for {other}")
-        elif (olb := len(other.members) - len(other.labels[0])) // 2:
+        elif (olb := len(other.members) - (len(other.labels[0]) // 2)):
             MISMATCH.add((str(other), olb))
-            # print(f"Mismatch Other: {olb}")
-        # print(f"NOT SAME {self} {other}")
         return False
 
     def __repr__(self):
-        info = f"{len(self.members)}_count" if self._labels is None else '|'.join(self._labels)
-        return f"< #{self.index}T:{info} >"
+        info = f"{len(self.members)}_count" if self._labels is None else self._labels[0]
+        return f"<T:{info}>"
 
     # def __hash__(self):
     #     return hash(bin(int(min(self.labels))))
