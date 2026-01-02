@@ -36,7 +36,7 @@ class Tree:
         #         parent = idx
         #         child = tuple(children)[-1]
         #         break
-        # errors = cls.travel(child, parent, set((parent,)))
+        # errors = cls.find_loop(child, parent, set((parent,)))
         # if errors:
         #     print(f"Loops at {errors}")
         # else:
@@ -44,13 +44,13 @@ class Tree:
 
 
     @classmethod
-    def travel(cls, curr, parent, visited):
+    def find_loop(cls, curr, parent, visited):
         if curr in visited:
             return [curr]
         visited.add(curr)
         children = cls.graph[curr] - {parent, }
         if children:
-            return sum((cls.travel(child, curr, visited) for child in children), [])
+            return sum((cls.find_loop(child, curr, visited) for child in children), [])
         return []
 
     @classmethod
@@ -162,11 +162,11 @@ class Tree:
 
     def build(self, root: int) -> set[int]:
         visited = set()
-        pre = {root, }
+        nxt = {root, }
         dist = -1
-        while pre and dist < self.radius:
-            visited.update(curr := pre - visited)
-            pre = set(d for c in curr for d in self.graph[c])
+        while (curr := nxt - visited) and dist < self.radius:
+            visited.update(curr)
+            nxt = set(d for c in curr for d in self.graph[c])
             dist += 1
         return visited
 
