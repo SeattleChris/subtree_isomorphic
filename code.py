@@ -54,7 +54,7 @@ class Tree:
         return []
 
     @classmethod
-    def _get_path(cls, curr: int, end: int, parent: int, members: set[int]) -> list[int]:
+    def _get_path(cls, curr: int, end: int, parent: int, members: set[int]) -> list[int] | None:
         if curr == end:
             return [curr]
         if (found := cls.PATHS.get((curr, end), 0)) != 0:
@@ -70,7 +70,7 @@ class Tree:
         cls.PATHS[(end, curr)] = None
         return None
 
-    def get_paths(self, ends: set[int]) -> list[int]:
+    def get_paths(self, ends: set[int]) -> list[list[int]]:
         if self.radius == 0:
             return [[self.index], ]
         allowed = self.members - ends
@@ -100,18 +100,19 @@ class Tree:
     def leafs(self):
         return self.degree[1]
 
-    def center_connections(self, centers: set[int], display: bool = False) -> tuple[int]:
-        if len(centers) < 2:
+    def center_connections(self, mids: set[int], display: bool = False) -> tuple[tuple[int]]:
+        if len(mids) < 2:
             return tuple()
-        adjacent = (self._get_path(a, b, None, centers) for a, b in combinations(centers, 2))
-        paths = tuple(self.get_paths(centers) + list(filter(None, adjacent)))
-        if len(paths) == 1 and set(paths[0]) == centers:
+        adj = (self._get_path(a, b, None, mids) for a, b in combinations(mids, 2))
+        paths = tuple(tuple(p) for p in self.get_paths(mids) + list(filter(None, adj)))
+        if len(paths) == 1 and set(paths[0]) == mids:
             return tuple()
         if display:
-            print(f"Prune Paths: {paths} for centers {tuple(centers)}")
+            print(f"Prune Paths: {paths} for centers {tuple(mids)}")
         return paths
 
-    def prune_centers(self) -> (tuple[int], tuple[str]):
+    def get_center_labels(self) -> (tuple[int], tuple[str]):
+        """Using the pruning method to find centers and labels."""
         visited = children = set(self.leafs)
         parents = set(p for c in children for p in self.graph[c] & self.members - visited)
         while parents:
@@ -123,7 +124,7 @@ class Tree:
                 for p in self.graph[c] & self.members - visited
                 if len(self.graph[p] & self.members - visited) == 1
                 )
-        # self.display_center_paths(children, True)
+        # self.center_connections(children, True)
         ah_mids = [(self.ahu_height(mid, None), mid) for mid in children]
         lo = min(ah[1] for ah, c in ah_mids)
         ahu_centers = sorted((ah[0], c) for ah, c in ah_mids if ah[1] == lo)
@@ -153,10 +154,6 @@ class Tree:
                 tuple(_summary(p) for p in paths if len(p) == size)
                 ))
         return [_centers, _labels]
-
-    def get_center_labels(self) -> tuple[int]:
-        # return self.path_centers()
-        return self.prune_centers()
 
     @property
     def centers(self) -> tuple[int]:
@@ -206,12 +203,13 @@ class Tree:
         return f"<T:{info}>"
 
     # def __hash__(self):
-    #     return hash(bin(int(min(self.labels))))
+    #     return hash(bin(int(self.labels[0], base=2)))
 
 
 def jennysSubtrees(n, r, edges):
     """
-    Pass tests 0-12; Fail on test 21; Timeout on 7 remaining of 22 tests.
+    Pass tests 0-12, 18; Fail test 21; Timeout on 7 remaining of 22 tests.
+    Correct answer for test 17, despite timeout.
     Previously had error on tests 16, 19, 20, 21.
     Had phantom success on tests 14 and 17 on very old version.
     """
@@ -254,7 +252,6 @@ def jennysSubtrees(n, r, edges):
     return len(uniq)
 
 if __name__ == '__main__':
-    # fptr = open(os.environ['OUTPUT_PATH'], 'w')
     first_multiple_input = input().rstrip().split()
     n = int(first_multiple_input[0])
     r = int(first_multiple_input[1])
@@ -262,6 +259,7 @@ if __name__ == '__main__':
     for _ in range(n - 1):
         edges.append(list(map(int, input().rstrip().split())))
     result = jennysSubtrees(n, r, edges)
+    # fptr = open(os.environ['OUTPUT_PATH'], 'w')
     # fptr.write(str(result) + '\n')
     # fptr.close()
     print(result)
