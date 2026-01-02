@@ -1,7 +1,6 @@
 #!/bin/python3
 
 import os
-import sys
 from collections import defaultdict
 from itertools import combinations
 from typing import Iterable
@@ -125,7 +124,7 @@ class Tree:
                 for p in self.graph[c] & self.members - visited
                 if len(self.graph[p] & self.members - visited) == 1
                 )
-        # self.display_center_paths(children, True)
+        # self.center_connections(children, True)
         ah_mids = [(self.ahu_height(mid, None), mid) for mid in children]
         lo = min(ah[1] for ah, c in ah_mids)
         ahu_centers = sorted((ah[0], c) for ah, c in ah_mids if ah[1] == lo)
@@ -209,7 +208,8 @@ class Tree:
 
 def jennysSubtrees(n, r, edges):
     """
-    Pass tests 0-12, 18; Fail test 21; Timeout but correct Correct on 17. Timeout on 6 remaining of 22 tests.
+    Pass tests 0-12, 18; Fail test 21; Timeout on 7 remaining of 22 tests.
+    Correct answer for test 17, despite timeout.
     Previously had error on tests 16, 19, 20, 21.
     Had phantom success on tests 14 and 17 on very old version.
     """
@@ -252,7 +252,6 @@ def jennysSubtrees(n, r, edges):
     return len(uniq)
 
 if __name__ == '__main__':
-    # fptr = open(os.environ['OUTPUT_PATH'], 'w')
     first_multiple_input = input().rstrip().split()
     n = int(first_multiple_input[0])
     r = int(first_multiple_input[1])
@@ -260,6 +259,7 @@ if __name__ == '__main__':
     for _ in range(n - 1):
         edges.append(list(map(int, input().rstrip().split())))
     result = jennysSubtrees(n, r, edges)
+    # fptr = open(os.environ['OUTPUT_PATH'], 'w')
     # fptr.write(str(result) + '\n')
     # fptr.close()
     print(result)
