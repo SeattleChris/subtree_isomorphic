@@ -1,6 +1,7 @@
 #!/bin/python3
 
 import os
+import sys
 from collections import defaultdict
 from itertools import combinations
 from typing import Iterable
@@ -203,7 +204,7 @@ class Tree:
         return f"<T:{info}>"
 
     # def __hash__(self):
-    #     return hash(bin(int(min(self.labels))))
+    #     return hash(bin(int(self.labels[0], base=2)))
 
 
 def jennysSubtrees(n, r, edges):
