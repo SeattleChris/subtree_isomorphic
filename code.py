@@ -2,7 +2,7 @@
 
 import os
 from collections import defaultdict
-from itertools import combinations
+from itertools import combinations, chain
 from typing import Iterable
 
 MISMATCH = set()
@@ -55,21 +55,22 @@ class Tree:
         return []
 
     @classmethod
-    def _get_path(cls, curr: int, end: int, parent: int, members: set[int]) -> list[int] | None:
+    def _get_path(cls, curr: int, end: int, prev: int, allowed: set[int], dead: set) -> list[int]:
         if curr == end:
             return [curr]
-        if (found := cls.PATHS.get((curr, end), 0)) != 0:
-            if found is None or not set(found) - members:
-                return found
-        nxt = cls.graph[curr] & members - {parent, }
-        for found in filter(None, (cls._get_path(d, end, curr, members) for d in nxt)):
+        if (curr, end) in dead:
+            return []
+        if (found := cls.PATHS.get((curr, end), None)) and not set(found) - allowed:
+            return found
+        nxt = (cls.graph[curr] & allowed) - {prev, }
+        for found in filter(None, (cls._get_path(d, end, curr, allowed, dead) for d in nxt)):
             # Either None, or max one possible 'found' path in a valid tree
             cls.PATHS[(curr, end)] = (path := [curr] + found)
             cls.PATHS[(end, curr)] = path[::-1]
             return path
-        cls.PATHS[(curr, end)] = None
-        cls.PATHS[(end, curr)] = None
-        return None
+        dead.add((curr, end))
+        dead.add((end, curr))
+        return []
 
     def get_paths(self, ends: set[int]) -> list[list[int]]:
         if self.radius == 0:
@@ -77,7 +78,7 @@ class Tree:
         allowed = self.members - ends
         starts = {start: e for e in ends for start in self.graph[e] & allowed}
         # overwrite of earlier start: leaf pair is acceptable; All leafs excluded from allowed
-        paths = (self._get_path(a, b, starts[a], allowed) for a, b in combinations(starts, 2))
+        paths = (self._get_path(a, b, starts[a], allowed, self.dead) for a, b in combinations(starts, 2))
         return list(filter(None, paths))
 
     def ahu_height(self, curr, parent) -> tuple[str, int, int]:
@@ -104,8 +105,8 @@ class Tree:
     def center_connections(self, mids: set[int], display: bool = False) -> tuple[tuple[int]]:
         if len(mids) < 2:
             return tuple()
-        adj = (self._get_path(a, b, None, mids) for a, b in combinations(mids, 2))
-        paths = tuple(tuple(p) for p in self.get_paths(mids) + list(filter(None, adj)))
+        adj = (self._get_path(a, b, None, mids, set()) for a, b in combinations(mids, 2))
+        paths = tuple(tuple(p) for p in chain(self.get_paths(mids), adj))
         if len(paths) == 1 and set(paths[0]) == mids:
             return tuple()
         if display:
@@ -132,7 +133,7 @@ class Tree:
         _centers = tuple(c for ahu, c in ahu_centers)
         _labels = tuple(ahu for ahu, c in ahu_centers)
         if len(_centers) > 2:
-            paths = self.center_connections(set(_centers), False)
+            paths = tuple(filter(None, self.center_connections(set(_centers), False)))
             OVERCENTER.add((self.index, _centers, paths))
         return [_centers, _labels]
 
