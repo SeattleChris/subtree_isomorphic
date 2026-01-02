@@ -70,8 +70,14 @@ class Tree:
         cls.PATHS[(end, curr)] = None
         return None
 
-    def get_path(self, curr, end) -> list[int]:
-        return self._get_path(curr, end, None, self.members) or []
+    def get_paths(self, ends: set[int]) -> list[int]:
+        if self.radius == 0:
+            return [[self.index], ]
+        allowed = self.members - ends
+        starts = {start: e for e in ends for start in self.graph[e] & allowed}
+        # overwrite of earlier start: leaf pair is acceptable; All leafs excluded from allowed
+        paths = (self._get_path(a, b, starts[a], allowed) for a, b in combinations(starts, 2))
+        return list(filter(None, paths))
 
     def ahu_height(self, curr, parent) -> tuple[str, int]:
         children = self.graph[curr] & self.members - {parent, }
