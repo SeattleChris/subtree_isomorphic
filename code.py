@@ -157,6 +157,41 @@ class Tree:
                 ))
         return [_centers, _labels]
 
+    def furthest_leaf(self, start: int) -> (int, int, set[int]):
+        visited = set()
+        nxt = last = {start, }
+        dist = -1
+        while (curr := nxt - visited):
+            last = curr
+            visited.update(curr)
+            nxt = set(d for c in curr for d in self.graph[c] & self.members)
+            dist += 1
+        if len(last) > 1:
+            print(f"Multiple furthest leafs from {start}: {last}")
+        return last.pop(), dist, visited
+
+    def diameter_centers(self) -> (tuple[int], tuple[str]):
+        far = tuple(self.far)[-1]
+        a, _, _ = self.furthest_leaf(far)
+        b, dia, visited = self.furthest_leaf(a)
+        path: list[int] = self._get_path(a, b, None, visited, self.dead)
+        end = 1 + dia // 2
+        beg = end - 2 + dia % 2
+        # print(f"Diameter Path: {a} {b} {dia=} {path[beg:end] if path else path}")
+        ah_mids = [self.ahu_height(mid, None) for mid in path[beg:end]]
+        lo = min(h for a, h, m in ah_mids)
+        ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
+        _centers = tuple(c for ahu, c in ahu_centers)
+        _labels = tuple(ahu for ahu, c in ahu_centers)
+        if len(_centers) > 2:
+            def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
+            OVERCENTER.add((
+                self.index,
+                tuple(_centers),
+                tuple(_summary(p) for p in path)
+                ))
+        return [_centers, _labels]
+
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
