@@ -115,18 +115,19 @@ class Tree:
     def prune_for_centers(self) -> (tuple[int], tuple[str]):
         """Using the pruning method to find centers and labels."""
         visited = curr = nxt = self.leafs
-        while nxt:
-            curr = nxt
-            visited |= curr
-            nxt = set(
-                x
-                for c in curr
-                for x in (self.graph[c] & self.members) - visited
-                if len(self.graph[x] & self.members - visited) == 1
-                )
-        mids = set(x for c in curr for x in (self.graph[c] & self.members) - visited) or curr
+        while len(visited | nxt) < len(self.members):
+            while nxt:
+                curr = nxt
+                visited |= curr
+                nxt = set(
+                    x
+                    for c in curr
+                    for x in (self.graph[c] & self.members) - visited
+                    if len(self.graph[x] & self.members - visited) < 2
+                    )
+            nxt = set(x for c in curr for x in (self.graph[c] & self.members) - visited)
         # self.center_connections(curr, True)
-        ah_mids = [self.ahu_height(mid, None) for mid in mids]
+        ah_mids = [self.ahu_height(mid, None) for mid in nxt or curr]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
         _centers = tuple(c for ahu, c in ahu_centers)
