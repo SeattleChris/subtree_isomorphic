@@ -99,7 +99,7 @@ class Tree:
 
     @property
     def leafs(self) -> set[int]:
-        return self.degree[1]
+        return frozenset(self.degree[1])
 
     def center_connections(self, mids: set[int], display: bool = False) -> tuple[tuple[int]]:
         if len(mids) < 2:
@@ -114,8 +114,7 @@ class Tree:
 
     def prune_for_centers(self) -> (tuple[int], tuple[str]):
         """Using the pruning method to find centers and labels."""
-        visited = curr = self.leafs
-        nxt = set(p for c in curr for p in (self.graph[c] & self.members) - visited)
+        visited = curr = nxt = self.leafs
         while nxt:
             curr = nxt
             visited |= curr
@@ -125,8 +124,9 @@ class Tree:
                 for x in (self.graph[c] & self.members) - visited
                 if len(self.graph[x] & self.members - visited) == 1
                 )
+        mids = set(x for c in curr for x in (self.graph[c] & self.members) - visited) or curr
         # self.center_connections(curr, True)
-        ah_mids = [self.ahu_height(mid, None) for mid in curr]
+        ah_mids = [self.ahu_height(mid, None) for mid in mids]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
         _centers = tuple(c for ahu, c in ahu_centers)
@@ -156,6 +156,7 @@ class Tree:
         return [_centers, _labels]
 
     def furthest_leaf(self, start: int) -> (int, int, set[int]):
+        """In case of multiple furthest leafs, any arbitrary one will do."""
         visited = set()
         nxt = last = {start, }
         dist = -1
@@ -164,14 +165,13 @@ class Tree:
             visited.update(curr)
             nxt = set(d for c in curr for d in self.graph[c] & self.members)
             dist += 1
-        # There can be multiple furthest leafs in case of ties any arbitrary one will do
         return last.pop(), dist, visited
 
     def diameter_centers(self) -> (tuple[int], tuple[str]):
         far = tuple(self.far)[-1]
         a, _, _ = self.furthest_leaf(far)
         b, dia, visited = self.furthest_leaf(a)
-        path: list[int] = self._get_path(a, b, None, visited)
+        path = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
         beg = end - 2 + dia % 2
         # print(f"Diameter Path: {a} {b} {dia=} {path[beg:end] if path else path}")
@@ -191,16 +191,16 @@ class Tree:
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
-            # self._centers, self._labels = self.prune_for_centers()
-            self._centers, self._labels = self.all_path_centers()
+            self._centers, self._labels = self.prune_for_centers()
+            # self._centers, self._labels = self.all_path_centers()
             # self._centers, self._labels = self.diameter_centers()
         return self._centers
 
     @property
     def labels(self) -> tuple[str]:
         if not self._labels:
-            # self._centers, self._labels = self.prune_for_centers()
-            self._centers, self._labels = self.all_path_centers()
+            self._centers, self._labels = self.prune_for_centers()
+            # self._centers, self._labels = self.all_path_centers()
             # self._centers, self._labels = self.diameter_centers()
         return self._labels
 
