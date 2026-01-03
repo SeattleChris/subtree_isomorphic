@@ -55,30 +55,29 @@ class Tree:
         return []
 
     @classmethod
-    def _get_path(cls, curr: int, end: int, prev: int, allowed: set[int], dead: set) -> list[int]:
+    def _get_path(cls, curr: int, end: int, prev: int, allowed: set[int]) -> list[int]:
         if curr == end:
             return [curr]
-        if (curr, end) in dead:
-            return []
-        if (found := cls.PATHS.get((curr, end), None)) and not set(found) - allowed:
-            return found
-        nxt = (cls.graph[curr] & allowed) - {prev, }
-        for found in filter(None, (cls._get_path(d, end, curr, allowed, dead) for d in nxt)):
+        allow_now = allowed - {prev, }
+        if (found := cls.PATHS.get((curr, end), None)) and not set(found) - allow_now:
+            if len(set(found)) != len(found):
+                print(f"Invalid cached path from {curr} to {end}: {found}")
+                cls.PATHS.pop((curr, end))
+                cls.PATHS.pop((end, curr))
+            else:
+                return found
+        nxt = cls.graph[curr] & allow_now
+        for found in filter(None, (cls._get_path(d, end, curr, allowed) for d in nxt)):
             # Either None, or max one possible 'found' path in a valid tree
             cls.PATHS[(curr, end)] = (path := [curr] + found)
             cls.PATHS[(end, curr)] = path[::-1]
             return path
-        dead.add((curr, end))
-        dead.add((end, curr))
         return []
 
     def get_paths(self, ends: set[int]) -> list[list[int]]:
         if self.radius == 0:
             return [[self.index], ]
-        allowed = self.members - ends
-        starts = {start: e for e in ends for start in self.graph[e] & allowed}
-        # overwrite of earlier start: leaf pair is acceptable; All leafs excluded from allowed
-        paths = (self._get_path(a, b, starts[a], allowed, self.dead) for a, b in combinations(starts, 2))
+        paths = (self._get_path(a, b, None, self.members) for a, b in combinations(ends, 2))
         return list(filter(None, paths))
 
     def ahu_height(self, curr, parent) -> tuple[str, int, int]:
@@ -105,7 +104,7 @@ class Tree:
     def center_connections(self, mids: set[int], display: bool = False) -> tuple[tuple[int]]:
         if len(mids) < 2:
             return tuple()
-        adj = (self._get_path(a, b, None, mids, set()) for a, b in combinations(mids, 2))
+        adj = (self._get_path(a, b, None, mids) for a, b in combinations(mids, 2))
         paths = tuple(tuple(p) for p in chain(self.get_paths(mids), adj))
         if len(paths) == 1 and set(paths[0]) == mids:
             return tuple()
@@ -134,7 +133,7 @@ class Tree:
         _labels = tuple(ahu for ahu, c in ahu_centers)
         if len(_centers) > 2:
             paths = tuple(filter(None, self.center_connections(set(_centers), False)))
-            OVERCENTER.add((self.index, _centers, paths))
+            OVERCENTER.add((_centers, paths))
         return [_centers, _labels]
 
     def all_path_centers(self) -> (tuple[int], tuple[str]):
@@ -142,7 +141,7 @@ class Tree:
         size = max(len(p) for p in paths)
         end = 1 + size // 2
         beg = end - 2 + size % 2
-        mids = set(d for p in paths for d in p[beg:end] if len(p) == size)
+        mids = set(d for p in paths for d in p[beg:end] if len(p) == size)  # Remove redundant
         ah_mids = [self.ahu_height(mid, None) for mid in mids]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
@@ -151,7 +150,6 @@ class Tree:
         if len(_centers) > 2:
             def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
             OVERCENTER.add((
-                self.index,
                 tuple(_centers),
                 tuple(_summary(p) for p in paths if len(p) == size)
                 ))
@@ -173,7 +171,7 @@ class Tree:
         far = tuple(self.far)[-1]
         a, _, _ = self.furthest_leaf(far)
         b, dia, visited = self.furthest_leaf(a)
-        path: list[int] = self._get_path(a, b, None, visited, set())
+        path: list[int] = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
         beg = end - 2 + dia % 2
         # print(f"Diameter Path: {a} {b} {dia=} {path[beg:end] if path else path}")
@@ -185,7 +183,6 @@ class Tree:
         if len(_centers) > 2:
             def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
             OVERCENTER.add((
-                self.index,
                 tuple(_centers),
                 tuple(_summary(p) for p in path)
                 ))
@@ -194,16 +191,16 @@ class Tree:
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
-            self._centers, self._labels = self.prune_for_centers()
-            # self._centers, self._labels = self.all_path_centers()
+            # self._centers, self._labels = self.prune_for_centers()
+            self._centers, self._labels = self.all_path_centers()
             # self._centers, self._labels = self.diameter_centers()
         return self._centers
 
     @property
     def labels(self) -> tuple[str]:
         if not self._labels:
-            self._centers, self._labels = self.prune_for_centers()
-            # self._centers, self._labels = self.all_path_centers()
+            # self._centers, self._labels = self.prune_for_centers()
+            self._centers, self._labels = self.all_path_centers()
             # self._centers, self._labels = self.diameter_centers()
         return self._labels
 
@@ -216,7 +213,7 @@ class Tree:
             visited.update(curr)
             nxt = set(d for c in curr for d in self.graph[c])
             dist += 1
-        return visited, furthest
+        return frozenset(visited), furthest
 
     def __eq__(self, other):
         if not isinstance(other, Tree):
@@ -284,8 +281,8 @@ def jennysSubtrees(n, r, edges):
     nl = f"NoLabel={len(NOLABEL)}"
     total = len(MISMATCH | OVERCENTER | NOLABEL)
     print(f"Label Errors: {total=} {oc} {mm} {nl}")
-    for root, centers, paths in OVERCENTER:
-        print(f"{root=} {centers} {paths}")
+    for centers, paths in OVERCENTER:
+        print(f"{centers} :: {paths}")
     for tree, members in NOLABEL:
         print(f"{members=} {tree}")
     for tree, missing in MISMATCH:
