@@ -138,6 +138,7 @@ class Tree:
         return [_centers, _labels]
 
     def all_path_centers(self) -> (tuple[int], tuple[str]):
+        """Explores all possible leaf to leaf paths, finding centers for longest paths."""
         paths = self.get_paths(self.leafs)
         size = max(len(p) for p in paths)
         end = 1 + size // 2
@@ -156,26 +157,26 @@ class Tree:
                 ))
         return [_centers, _labels]
 
-    def furthest_leaf(self, start: int) -> (int, int, set[int]):
+    def furthest_leafs(self, start: int) -> (int, int, set[int]):
         """In case of multiple furthest leafs, any arbitrary one will do."""
         visited = set()
         nxt = last = {start, }
-        dist = -1
+        size = 0
         while (curr := nxt - visited):
             last = curr
             visited.update(curr)
             nxt = set(d for c in curr for d in self.graph[c] & self.members)
-            dist += 1
-        return last.pop(), dist, visited
+            size += 1
+        return size, last.pop(), visited
 
     def diameter_centers(self) -> (tuple[int], tuple[str]):
+        """Finds two furthest leafs, finds center(s) from center of that single path."""
         far = tuple(self.far)[-1]
-        a, _, _ = self.furthest_leaf(far)
-        b, dia, visited = self.furthest_leaf(a)
+        _, a, _ = self.furthest_leafs(far)
+        dia, b, visited = self.furthest_leafs(a)
         path = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
         beg = end - 2 + dia % 2
-        # print(f"Diameter Path: {a} {b} {dia=} {path[beg:end] if path else path}")
         ah_mids = [self.ahu_height(mid, None) for mid in path[beg:end]]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
@@ -192,17 +193,17 @@ class Tree:
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
-            self._centers, self._labels = self.prune_for_centers()
+            # self._centers, self._labels = self.prune_for_centers()
             # self._centers, self._labels = self.all_path_centers()
-            # self._centers, self._labels = self.diameter_centers()
+            self._centers, self._labels = self.diameter_centers()
         return self._centers
 
     @property
     def labels(self) -> tuple[str]:
         if not self._labels:
-            self._centers, self._labels = self.prune_for_centers()
+            # self._centers, self._labels = self.prune_for_centers()
             # self._centers, self._labels = self.all_path_centers()
-            # self._centers, self._labels = self.diameter_centers()
+            self._centers, self._labels = self.diameter_centers()
         return self._labels
 
     def build(self, root: int) -> set[int]:
@@ -247,8 +248,9 @@ class Tree:
 
 def jennysSubtrees(n, r, edges):
     """
-    Pass tests 0-12, 18; Fail test 21; Timeout on 7 remaining of 22 tests.
+    Pass tests 0-12, 18; Runtime error tests 21 & 21; Timeout on 6 remaining of 22 tests.
     Correct answer for test 17, despite timeout.
+    Above is for diameter_centers method. Timeout test 21 for prune_for_centers method.
     Previously had error on tests 16, 19, 20, 21.
     Had phantom success on tests 14 and 17 on very old version.
     """
