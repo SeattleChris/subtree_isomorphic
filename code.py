@@ -9,6 +9,15 @@ MISMATCH = set()
 NOLABEL = set()
 OVERCENTER = set()
 
+def find_loop(curr, parent, visited, graph):
+    if curr in visited:
+        return [curr]
+    visited.add(curr)
+    children = graph[curr] - {parent, }
+    if children:
+        return sum((find_loop(child, curr, visited, graph) for child in children), [])
+    return []
+
 
 class Tree:
     # PATHS = {}
@@ -31,28 +40,6 @@ class Tree:
             return None
         cls.graph = list(adjacency)
         cls.PATHS: dict[tuple[int, int], list[int]] = {}
-        # parent, child = None, None
-        # for idx, children in enumerate(cls.graph):
-        #     if len(children) == 1:
-        #         parent = idx
-        #         child = tuple(children)[-1]
-        #         break
-        # errors = cls.find_loop(child, parent, set((parent,)))
-        # if errors:
-        #     print(f"Loops at {errors}")
-        # else:
-        #     print("No loops detected")
-
-
-    @classmethod
-    def find_loop(cls, curr, parent, visited):
-        if curr in visited:
-            return [curr]
-        visited.add(curr)
-        children = cls.graph[curr] - {parent, }
-        if children:
-            return sum((cls.find_loop(child, curr, visited) for child in children), [])
-        return []
 
     @classmethod
     def _get_path(cls, curr: int, end: int, prev: int, allowed: set[int]) -> list[int]:
@@ -60,12 +47,7 @@ class Tree:
             return [curr]
         allow_now = allowed - {prev, }
         if (found := cls.PATHS.get((curr, end), None)) and not set(found) - allow_now:
-            if len(set(found)) != len(found):
-                print(f"Invalid cached path from {curr} to {end}: {found}")
-                cls.PATHS.pop((curr, end))
-                cls.PATHS.pop((end, curr))
-            else:
-                return found
+            return found
         nxt = cls.graph[curr] & allow_now
         for found in filter(None, (cls._get_path(d, end, curr, allowed) for d in nxt)):
             # Either None, or max one possible 'found' path in a valid tree
@@ -138,7 +120,7 @@ class Tree:
         return [_centers, _labels]
 
     def all_path_centers(self) -> (tuple[int], tuple[str]):
-        """Explores all possible leaf to leaf paths, finding centers for longest paths."""
+        """Explores all possible leaf to leaf paths, finding centers for all longest paths."""
         paths = self.get_paths(self.leafs)
         size = max(len(p) for p in paths)
         end = 1 + size // 2
@@ -157,7 +139,7 @@ class Tree:
                 ))
         return [_centers, _labels]
 
-    def furthest_leafs(self, start: int) -> (int, int, set[int]):
+    def furthest_leaf(self, start: int) -> (int, int, set[int]):
         """In case of multiple furthest leafs, any arbitrary one will do."""
         visited = set()
         nxt = last = {start, }
@@ -172,8 +154,8 @@ class Tree:
     def diameter_centers(self) -> (tuple[int], tuple[str]):
         """Finds two furthest leafs, finds center(s) from center of that single path."""
         far = tuple(self.far)[-1]
-        _, a, _ = self.furthest_leafs(far)
-        dia, b, visited = self.furthest_leafs(a)
+        _, a, _ = self.furthest_leaf(far)
+        dia, b, visited = self.furthest_leaf(a)
         path = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
         beg = end - 2 + dia % 2
@@ -254,7 +236,7 @@ def jennysSubtrees(n, r, edges):
     Previously had error on tests 16, 19, 20, 21.
     Had phantom success on tests 14 and 17 on very old version.
     """
-    if r > n - 2:
+    if r > n - 2 or r == 0:
         return 1
     # if n == 3000 and r > 900:
     #     return 547
@@ -266,19 +248,9 @@ def jennysSubtrees(n, r, edges):
     trees = [Tree(idx, r, seq) for idx in range(1, n + 1)]
     # uniq = set(trees)
     uniq = []
-    # # drop = []
     for tree in trees:
         if tree not in uniq:
             uniq.append(tree)
-    #     else:
-    #         drop.append(tree)
-    # print(f"Tree: {len(trees)} {n=} {r=}")
-    # print(f"Uniq: {len(uniq)}")
-    # for ea in uniq:
-    #     print(ea)
-    # print(f"Drop: {len(drop)}")
-    # for ea in drop:
-    #     print(ea)
     mm = f"Mismatch={len(MISMATCH)}"
     oc = f"OverCenter={len(OVERCENTER)}"
     nl = f"NoLabel={len(NOLABEL)}"
