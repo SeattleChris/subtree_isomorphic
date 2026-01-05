@@ -28,7 +28,7 @@ class Tree:
         self.radius: int = radius
         if not hasattr(self, 'graph'):
             self.set_graph(adjacency)
-        self.members, self.far = self.build(root)
+        self.members, self.far, self.depth = self.build(root)
         self.dead: set[tuple[int, int]] = set()
         self._degree: dict[int, int] = None
         self._centers: tuple[int] = None
@@ -86,8 +86,7 @@ class Tree:
     def center_connections(self, mids: set[int], display: bool = False) -> tuple[tuple[int]]:
         if len(mids) < 2:
             return tuple()
-        adj = (self._get_path(a, b, None, mids) for a, b in combinations(mids, 2))
-        paths = tuple(tuple(p) for p in chain(self.get_paths(mids), adj))
+        paths = tuple(tuple(p) for p in self.get_paths(mids))
         if len(paths) == 1 and set(paths[0]) == mids:
             return tuple()
         if display:
@@ -119,9 +118,10 @@ class Tree:
             OVERCENTER.add((_centers, paths))
         return [_centers, _labels]
 
-    def all_path_centers(self) -> (tuple[int], tuple[str]):
+    def all_path_centers(self, ends=None) -> (tuple[int], tuple[str]):
         """Explores all possible leaf to leaf paths, finding centers for all longest paths."""
-        paths = self.get_paths(self.leafs)
+        ends = ends or self.leafs
+        paths = self.get_paths(ends)
         size = max(len(p) for p in paths)
         end = 1 + size // 2
         beg = end - 2 + size % 2
@@ -151,12 +151,13 @@ class Tree:
             size += 1
         return size, last.pop(), visited
 
-    def diameter_centers(self) -> (tuple[int], tuple[str]):
+    def diameter_centers(self, path=None) -> (tuple[int], tuple[str]):
         """Finds two furthest leafs, finds center(s) from center of that single path."""
-        far = tuple(self.far)[-1]
-        _, a, _ = self.furthest_leaf(far)
-        dia, b, visited = self.furthest_leaf(a)
-        path = self._get_path(a, b, None, visited)
+        dia = None if not path else len(path)
+        if path is None:
+            _, a, _ = self.furthest_leaf(tuple(self.far)[-1])
+            dia, b, visited = self.furthest_leaf(a)
+            path = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
         beg = end - 2 + dia % 2
         ah_mids = [self.ahu_height(mid, None) for mid in path[beg:end]]
@@ -175,20 +176,26 @@ class Tree:
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
+            path = None
+            if 1 < len(self.far) < 3:
+                highest = 2 * self.radius + 1
+                paths = self.get_paths(self.far)
+                size = max(len(p) for p in paths)
+                diff = highest - size
+                if diff <= 1:
+                    path = next(p for p in paths if len(p) == size)
+            self._centers, self._labels = self.diameter_centers(path)
             # self._centers, self._labels = self.prune_for_centers()
             # self._centers, self._labels = self.all_path_centers()
-            self._centers, self._labels = self.diameter_centers()
         return self._centers
 
     @property
     def labels(self) -> tuple[str]:
         if not self._labels:
-            # self._centers, self._labels = self.prune_for_centers()
-            # self._centers, self._labels = self.all_path_centers()
-            self._centers, self._labels = self.diameter_centers()
+            self.centers # Trigger center and label calculation
         return self._labels
 
-    def build(self, root: int) -> set[int]:
+    def build(self, root: int) -> (set[int], set[int], int):
         visited = set()
         nxt = furthest = {root, }
         dist = -1
@@ -197,7 +204,7 @@ class Tree:
             visited.update(curr)
             nxt = set(d for c in curr for d in self.graph[c])
             dist += 1
-        return frozenset(visited), furthest
+        return frozenset(visited), furthest, dist
 
     def __eq__(self, other):
         if not isinstance(other, Tree):
