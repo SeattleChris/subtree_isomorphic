@@ -146,6 +146,39 @@ class Tree:
                 ))
         return [_centers, _labels]
 
+    def get_longest_path(self, paths: list[list[int]]) -> list[int]:
+        leaf_paths = (p for p in paths if len(self.graph[p[-1]] & self.members) == 1)
+        paths = sorted(leaf_paths, key=len, reverse=True)
+        if len(paths) == 1:
+            # print(f"On {self.index} ({self.radius},{self.depth}) From path({len(paths)}) 1 useable {usable[0]}")
+            return paths[0]
+        possible_max = min(self.radius, self.depth) * 2 + 1
+        longest = 0
+        opts = []
+        for idx, p in enumerate(paths[: -1], 1):
+            if len(p) + len(paths[idx]) - 1 <= longest or longest == possible_max:
+                if longest == 0:
+                    print(f"BREAK {longest=} current {p=}")
+                break
+            for h in paths[idx:]:
+                if (curr := len(p) + len(h)) - 1 <= longest:
+                    if longest == 0:
+                        print(f"CONTINUE {longest=} current {p=}")
+                    continue
+                if (diff := curr - len(set(p + h))) < len(h) + 1:
+                    opts.append(p[:diff - 1:-1] + h[diff - 1:])  # Shared node included from h
+                    longest = max(longest, len(opts[-1]))
+        if not opts:
+            # raise ValueError(f"On {self.index} ({self.radius},{self.depth}) No {longest=} path({len(paths)}): {paths=}")
+            # print(f"On {self.index} ({self.radius},{self.depth}) No {longest=} path({len(paths)}): {paths=}")
+            print(f"On {self.index}. No {longest=} path({len(paths)}). Rad,Dep,Max: {self.radius}, {self.depth}, {possible_max}")
+            for p in paths:
+                print("    ", p)
+        # for p in result:
+        #     self.PATHS[(p[0], p[-1])] = p
+        #     self.PATHS[(p[-1], p[0])] = p[::-1]
+        return next((p for p in opts if len(p) == longest), [])
+
     def furthest_leaf(self, start: int) -> (int, int, set[int]):
         """In case of multiple furthest leafs, any arbitrary one will do."""
         visited = set()
@@ -160,9 +193,9 @@ class Tree:
 
     def diameter_centers(self, path=None) -> (tuple[int], tuple[str]):
         """Finds two furthest leafs, finds center(s) from center of that single path."""
-        dia = None if not path else len(path)
-        if path is None:
-            _, a, _ = self.furthest_leaf(tuple(self.far)[-1])
+        dia = len(path) if path else -1
+        if not path:
+            _, a, _ = self.furthest_leaf(tuple(self.farthest)[-1])
             dia, b, visited = self.furthest_leaf(a)
             path = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
@@ -184,9 +217,11 @@ class Tree:
     def centers(self) -> tuple[int]:
         if not self._centers:
             path = None
-            if 1 < len(self.far) < 3:
-                highest = 2 * self.radius + 1
-                paths = self.get_paths(self.far)
+            if self.radius == self.depth:
+                path = self.get_longest_path(self.paths)
+            elif 1 < len(self.farthest) < 3:
+                highest = 2 * min(self.radius, self.depth) + 1
+                paths = self.get_paths(self.farthest)
                 size = max(len(p) for p in paths)
                 diff = highest - size
                 if diff <= 1:
@@ -202,7 +237,7 @@ class Tree:
             self.centers # Trigger center and label calculation
         return self._labels
 
-    def build(self, root: int) -> (set[int], set[int], int):
+    def build_breadth(self, root: int) -> (set[int], set[int], int):
         visited = set()
         nxt = furthest = {root, }
         dist = -1
