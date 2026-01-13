@@ -29,7 +29,7 @@ class Tree:
         if not hasattr(self, 'graph'):
             self.set_graph(adjacency)
         dist, paths = self.build(root)
-        self.depth = dist
+        self.depth: int = dist
         size = max(len(p) for p in paths)
         # sizes = [len(p) for p in paths]
         # print(f"All {len(paths)} {sizes=}")
