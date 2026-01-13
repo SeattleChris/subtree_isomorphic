@@ -2,7 +2,7 @@
 
 import os
 from collections import defaultdict
-from itertools import combinations, chain
+from itertools import combinations
 from typing import Iterable
 
 MISMATCH = set()
@@ -28,8 +28,15 @@ class Tree:
         self.radius: int = radius
         if not hasattr(self, 'graph'):
             self.set_graph(adjacency)
-        self.members, self.far, self.depth = self.build(root)
-        self.dead: set[tuple[int, int]] = set()
+        dist, paths = self.build(root)
+        self.depth = dist
+        size = max(len(p) for p in paths)
+        # sizes = [len(p) for p in paths]
+        # print(f"All {len(paths)} {sizes=}")
+        self.farthest: frozenset[int] = frozenset(p[-1] for p in paths if len(p) == size)
+        self.members: frozenset[int] = frozenset(d for p in paths for d in p)
+        self.paths = paths
+        self.populate_paths(paths)
         self._degree: dict[int, int] = None
         self._centers: tuple[int] = None
         self._labels: tuple[str] = None
@@ -205,6 +212,37 @@ class Tree:
             nxt = set(d for c in curr for d in self.graph[c])
             dist += 1
         return frozenset(visited), furthest, dist
+
+    def full_build(self, curr: int, dist=-1, path: list[int] = None) -> (int, set[int], list[list[int]]):
+        furthest = {curr, }
+        path = (path or []) + [curr]
+        paths: list[list[int]] = [path, ]
+        if dist < self.radius and (nxt := self.graph[curr] - set(path)):
+            children = [self.build(c, dist + 1, path) for c in nxt]
+            dist = max((d for d, f, pths in children), default=dist)
+            furthest = set().union(*(f for d, f, pths in children if d == dist)) or {curr,}
+            paths = [p for d, f, pths in children for p in pths] + [path, ]  #?  if d == dist
+        # self.PATHS.update({(p[0], p[-1]): p for p in paths if len(p) > 1})
+        # self.PATHS.update({(p[-1], p[0]): p[::-1] for p in paths if len(p) > 1})
+        # if len(paths) < 2 or self.radius != dist:
+        #     print(f"Build from {curr} {self.radius}: dist={dist},paths#={len(paths)}")
+        return dist, furthest, paths
+
+    def build(self, curr: int, dist=-1, path: list[int] = None) -> list[list[int]]:
+        updated = (path or []) + [curr]
+        paths: list[list[int]] = [updated, ]
+        if dist < self.radius and (nxt := self.graph[curr] - set(path or [])):
+            children = [self.build(c, dist + 1, updated) for c in nxt]
+            dist = max((d for d, pths in children), default=dist)
+            paths = [p for d, pths in children for p in pths] + [updated, ]  #?  if d == dist
+        return dist, paths
+
+
+    def populate_paths(self, paths: list[list[int]]):
+        for p in paths:
+            if len(p) > 1:
+                self.PATHS[(p[0], p[-1])] = p
+                self.PATHS[(p[-1], p[0])] = p[::-1]
 
     def __eq__(self, other):
         if not isinstance(other, Tree):
