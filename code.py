@@ -251,6 +251,19 @@ def jennysSubtrees(n, r, edges):
     for idx, pos in edges:
         rel[idx].add(pos)
         rel[pos].add(idx)
+    # #####################
+    # visited = set()
+    # nxt = last = {n, }
+    # size = 0
+    # while (curr := nxt - visited):
+    #     last = curr
+    #     visited.update(curr)
+    #     nxt = set(d for c in curr for d in rel[c])
+    #     size += 1
+    # far = last.pop()
+    # loop = find_loop(far, None, set(), rel)
+    # print("Loop detected:", loop)
+    # ############
     seq = (group for group in rel)
     trees = [Tree(idx, r, seq) for idx in range(1, n + 1)]
     # uniq = set(trees)
