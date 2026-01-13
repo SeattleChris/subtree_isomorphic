@@ -20,8 +20,8 @@ def find_loop(curr, parent, visited, graph):
 
 
 class Tree:
-    # PATHS = {}
-    # graph: list[set[int]]
+    PATHS: dict[tuple[int, int], list[int]] = {}
+    graph: list[set[int]]
 
     def __init__(self, root: int, radius: int, adjacency: Iterable[set[int]] = None):
         self.index: int = root
