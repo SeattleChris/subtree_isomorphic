@@ -24,19 +24,16 @@ class Tree:
     graph: list[set[int]]
 
     def __init__(self, root: int, radius: int, adjacency: Iterable[set[int]] = None):
-        self.index: int = root
+        self.origin: int = root
         self.radius: int = radius
         if not hasattr(self, 'graph'):
             self.set_graph(adjacency)
-        dist, paths = self.build(root)
+        self.paths: list[list[int]] = []  # All paths from origin
+        self.leaf_paths: list[list[int]] = []  # origin to leaf paths
+        members, furthest, dist = self.build(root)
+        self.members: frozenset[int] = members
+        self.farthest: list[int] = furthest
         self.depth: int = dist
-        size = max(len(p) for p in paths)
-        # sizes = [len(p) for p in paths]
-        # print(f"All {len(paths)} {sizes=}")
-        self.farthest: frozenset[int] = frozenset(p[-1] for p in paths if len(p) == size)
-        self.members: frozenset[int] = frozenset(d for p in paths for d in p)
-        self.paths = paths
-        self.populate_paths(paths)
         self._degree: dict[int, int] = None
         self._centers: tuple[int] = None
         self._labels: tuple[str] = None
@@ -51,28 +48,46 @@ class Tree:
     def centers(self) -> tuple[int]:
         if not self._centers:
             path = None
-            if self.radius == self.depth:
-                path = self.get_longest_path(self.paths)
-            elif 1 < len(self.farthest) < 3:
-                highest = 2 * min(self.radius, self.depth) + 1
-                paths = self.get_paths(self.farthest)
-                size = max(len(p) for p in paths)
-                diff = highest - size
-                if diff <= 1:
-                    path = next(p for p in paths if len(p) == size)
+            # path = self.make_long_path(self.paths)
+            # if (diff := self.radius - self.depth):
+            #     print(f"Shallow by {diff} on tree rooted at {self.origin}")
+            # if len(self.farthest) < 2:
+            #     print(f"Only one farthest leaf {self.farthest} on tree rooted at {self.origin}")
+            #     pass
+            # elif self.paths:  # and self.radius == self.depth:
+            #     path = self.make_long_path(self.paths)
+            # elif 1 < len(self.farthest) < 3:
+            #     highest = 2 * min(self.radius, self.depth) + 1
+            #     paths = self.get_paths(self.farthest)
+            #     size = max(len(p) for p in paths)
+            #     diff = highest - size
+            #     if diff <= 1:
+            #         path = next(p for p in paths if len(p) == size)
             self._centers, self._labels = self.diameter_centers(path)
             # self._centers, self._labels = self.prune_for_centers()
             # self._centers, self._labels = self.all_path_centers()
         return self._centers
 
-    def build(self, curr: int, dist=-1, path: list[int] = None) -> list[list[int]]:
-        updated = (path or []) + [curr]
-        paths: list[list[int]] = [updated, ]
-        if dist < self.radius and (nxt := self.graph[curr] - set(path or [])):
-            children = [self.build(c, dist + 1, updated) for c in nxt]
-            dist = max((d for d, pths in children), default=dist)
-            paths = [p for d, pths in children for p in pths] + [updated, ]  #?  if d == dist
-        return dist, paths
+    def build(self, curr: int) -> (set[int], set[int], int):
+        # b_members, b_furthest, b_dist = self.build_breadth(curr)
+        dist, paths = self.build_depth(curr)
+        furthest = [p[-1] for p in paths if len(p) == dist + 1]
+        if len(furthest) == 1:
+            furthest = [p[-1] for p in paths if len(p) == dist] + furthest
+        members = set().union(*paths)
+        self.paths = paths
+        # self.populate_paths(paths)
+        self.leaf_paths = [p for p in paths if len(self.graph[p[-1]] & members) == 1]
+        # d_mem = len(d_members) - len(b_members)
+        # d_fur = len(d_furthest & b_furthest)
+        # d_dis = d_dist - b_dist
+        # # o_mem = members - g_members
+        # o_fur = d_furthest - b_furthest
+        # o_fur = 'ALL' if o_fur == d_furthest else len(o_fur)
+        # m_fur = b_furthest - d_furthest
+        # m_fur = 'ALL' if m_fur == b_furthest else len(m_fur)
+        # print(f"{d_dis} mem:{d_mem} far:{d_fur} Over:{o_fur} Miss:{m_fur}")
+        return frozenset(members), furthest, dist
 
     def ahu_height(self, curr, parent) -> tuple[str, int, int]:
         children = self.graph[curr] & self.members - {parent, }
@@ -95,6 +110,15 @@ class Tree:
     def leafs(self) -> set[int]:
         return frozenset(self.degree[1])
 
+    def build_depth(self, curr: int, dist=0, path: list[int] = None) -> (int, list[list[int]]):
+        updated = (path or []) + [curr]
+        paths: list[list[int]] = [updated, ]
+        if dist < self.radius and (nxt := self.graph[curr] - set(path or [])):
+            children = [self.build_depth(c, dist + 1, updated) for c in nxt]
+            dist = max((d for d, pths in children), default=dist)
+            paths = [p for d, pths in children for p in pths] + [updated, ]  #?  if d == dist
+        return dist, paths
+
     def build_breadth(self, root: int) -> (set[int], set[int], int):
         visited = set()
         nxt = furthest = {root, }
@@ -104,22 +128,7 @@ class Tree:
             visited.update(curr)
             nxt = set(d for c in curr for d in self.graph[c])
             dist += 1
-        return frozenset(visited), furthest, dist
-
-    def full_build(self, curr: int, dist=-1, path: list[int] = None) -> (int, set[int], list[list[int]]):
-        furthest = {curr, }
-        path = (path or []) + [curr]
-        paths: list[list[int]] = [path, ]
-        if dist < self.radius and (nxt := self.graph[curr] - set(path)):
-            children = [self.build(c, dist + 1, path) for c in nxt]
-            dist = max((d for d, f, pths in children), default=dist)
-            furthest = set().union(*(f for d, f, pths in children if d == dist)) or {curr,}
-            paths = [p for d, f, pths in children for p in pths] + [path, ]  #?  if d == dist
-        # self.PATHS.update({(p[0], p[-1]): p for p in paths if len(p) > 1})
-        # self.PATHS.update({(p[-1], p[0]): p[::-1] for p in paths if len(p) > 1})
-        # if len(paths) < 2 or self.radius != dist:
-        #     print(f"Build from {curr} {self.radius}: dist={dist},paths#={len(paths)}")
-        return dist, furthest, paths
+        return visited, furthest, dist
 
     def populate_paths(self, paths: list[list[int]]):
         for p in paths:
@@ -150,8 +159,9 @@ class Tree:
         return []
 
     def get_paths(self, ends: set[int]) -> list[list[int]]:
+        print("Called get_paths")
         if self.radius == 0:
-            return [[self.index], ]
+            return [[self.origin], ]
         paths = (self._get_path(a, b, None, self.members) for a, b in combinations(ends, 2))
         return list(filter(None, paths))
 
@@ -167,18 +177,18 @@ class Tree:
 
     def prune_for_centers(self) -> (tuple[int], tuple[str]):
         """Using the pruning method to find centers and labels."""
-        visited = curr = nxt = self.leafs
-        while len(visited | nxt) < len(self.members):
+        visited = curr = nxt = leafs
+        while len(visited | nxt) < len(allowed):
             while nxt:
                 curr = nxt
                 visited |= curr
                 nxt = set(
                     x
                     for c in curr
-                    for x in (self.graph[c] & self.members) - visited
-                    if len(self.graph[x] & self.members - visited) < 2
+                    for x in (self.graph[c] & allowed) - visited
+                    if len(self.graph[x] & allowed - visited) < 2
                     )
-            nxt = set(x for c in curr for x in (self.graph[c] & self.members) - visited)
+            nxt = set(x for c in curr for x in (self.graph[c] & allowed) - visited)
         # self.center_connections(curr, True)
         ah_mids = [self.ahu_height(mid, None) for mid in nxt or curr]
         lo = min(h for a, h, m in ah_mids)
@@ -211,38 +221,35 @@ class Tree:
                 ))
         return [_centers, _labels]
 
-    def get_longest_path(self, paths: list[list[int]]) -> list[int]:
-        leaf_paths = (p for p in paths if len(self.graph[p[-1]] & self.members) == 1)
-        paths = sorted(leaf_paths, key=len, reverse=True)
+    def make_long_path(self, paths: list[list[int]]) -> list[int]:
+        """Combines two origin to leaf paths into one longer path, if possible."""
         if len(paths) == 1:
-            # print(f"On {self.index} ({self.radius},{self.depth}) From path({len(paths)}) 1 useable {usable[0]}")
             return paths[0]
-        possible_max = min(self.radius, self.depth) * 2 + 1
-        longest = 0
-        opts = []
-        for idx, p in enumerate(paths[: -1], 1):
-            if len(p) + len(paths[idx]) - 1 <= longest or longest == possible_max:
-                if longest == 0:
-                    print(f"BREAK {longest=} current {p=}")
-                break
-            for h in paths[idx:]:
-                if (curr := len(p) + len(h)) - 1 <= longest:
-                    if longest == 0:
-                        print(f"CONTINUE {longest=} current {p=}")
-                    continue
-                if (diff := curr - len(set(p + h))) < len(h) + 1:
-                    opts.append(p[:diff - 1:-1] + h[diff - 1:])  # Shared node included from h
-                    longest = max(longest, len(opts[-1]))
-        if not opts:
-            # raise ValueError(f"On {self.index} ({self.radius},{self.depth}) No {longest=} path({len(paths)}): {paths=}")
-            # print(f"On {self.index} ({self.radius},{self.depth}) No {longest=} path({len(paths)}): {paths=}")
-            print(f"On {self.index}. No {longest=} path({len(paths)}). Rad,Dep,Max: {self.radius}, {self.depth}, {possible_max}")
-            for p in paths:
-                print("    ", p)
-        # for p in result:
-        #     self.PATHS[(p[0], p[-1])] = p
-        #     self.PATHS[(p[-1], p[0])] = p[::-1]
-        return next((p for p in opts if len(p) == longest), [])
+        depth = min(self.radius, self.depth)
+        best = [p for p in paths if len(p) == depth + 1]
+        size = 2 * depth + 1
+        long_max = (a[:0:-1] + b for a, b in combinations(best, 2) if len(set(a + b)) == size)
+        res = next(long_max, [])
+        return res
+        # long = 0
+        # results = []
+        # paths = best + [p for p in paths if len(p) < depth + 1]
+        # start = len(best) - 1
+        # for idx, p in enumerate(paths[: -1], 1):
+        #     if long == size:
+        #         break
+        #     lp, sp = len(p), set(p)
+        #     found = [
+        #         p[:pos:-1] + h[pos:]
+        #         for h in paths[max(idx, start):]
+        #         if len(sp ^ set(h)) >= long
+        #         and (pos := lp + len(h) - 1 - len(sp | set(h))) < len(h)
+        #         ]
+        #     top = max(len(f) for f in found) if found else 0
+        #     results.extend(f for f in found if len(f) == top)
+        #     long = max(long, top)
+        # res = next((p for p in results[::-1] if len(p) == long), [])
+        # return res
 
     def furthest_leaf(self, start: int) -> (int, int, set[int]):
         """In case of multiple furthest leafs, any arbitrary one will do."""
@@ -265,7 +272,8 @@ class Tree:
             path = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
         beg = end - 2 + dia % 2
-        ah_mids = [self.ahu_height(mid, None) for mid in path[beg:end]]
+        mids = path[beg:end] if path else self.prune_path_center({a, b}, beg, end, visited & self.members)
+        ah_mids = [self.ahu_height(mid, None) for mid in mids]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
         _centers = tuple(c for ahu, c in ahu_centers)
@@ -274,7 +282,7 @@ class Tree:
             def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
             OVERCENTER.add((
                 tuple(_centers),
-                tuple(_summary(p) for p in path)
+                tuple(_summary(p) for p in path or [])
                 ))
         return [_centers, _labels]
 
