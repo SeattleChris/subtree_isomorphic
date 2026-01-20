@@ -178,17 +178,15 @@ class Tree:
 
     def prune_path_center(self, start: int, last: int, size: int, allowed: set[int]) -> set[int]:
         """Using the pruning method to find center for single path."""
-        extra = 1 - size % 2
-        visited = set()
-        curr = nxt = {start, }
-        turn = 0
-        while turn < size // 2:
-            curr = nxt or {last, }
-            visited |= curr
-            nxt = set(x for c in curr for x in self.graph[c] & allowed - visited)
-            turn += 1
-        centers = nxt | curr if extra else nxt
-        print(f"Path {size=} short:{size // 2 - turn} visited:{len(visited)} {start=} {last=} width:{extra + 1} {centers=}")
+        visited, seen = set(), set()
+        nxt, end = {start, }, {last, }
+        for _ in range(size // 2):
+            visited |= nxt
+            seen |= end
+            nxt = set(x for c in nxt for x in self.graph[c] & allowed - visited)
+            end = set(x for c in end for x in self.graph[c] & allowed - seen)
+        centers = nxt & end if size % 2 else nxt & seen | end & visited
+        PATHCENTERS.append(tuple(centers))
         return centers
 
     def prune_for_centers(self, leafs, allowed: set[int]) -> (tuple[int], tuple[str]):
