@@ -1,13 +1,14 @@
 #!/bin/python3
 
 import os
-from collections import defaultdict
+from collections import defaultdict, Counter
 from itertools import combinations, chain
 from typing import Iterable
 
 MISMATCH = set()
 NOLABEL = set()
 OVERCENTER = set()
+PATHCENTERS: list[set[int]] = []
 
 def find_loop(curr, parent, visited, graph):
     if curr in visited:
@@ -175,29 +176,20 @@ class Tree:
             print(f"Prune Paths: {paths} for centers {tuple(mids)}")
         return paths
 
-    def prune_path_center(self, leafs: set[int], beg: int, end: int, allowed: set[int]) -> (int, str):
+    def prune_path_center(self, start: int, last: int, size: int, allowed: set[int]) -> set[int]:
         """Using the pruning method to find center for single path."""
-        visited = curr = nxt = leafs
-        pos = 0
-        while pos < end and nxt:
-            curr = nxt
+        extra = 1 - size % 2
+        visited = set()
+        curr = nxt = {start, }
+        turn = 0
+        while turn < size // 2:
+            curr = nxt or {last, }
             visited |= curr
-            pos += 1
-            nxt = set(
-                x
-                for c in curr
-                for x in (self.graph[c] & allowed) - visited
-                if len(self.graph[x] & allowed - visited) < 2
-                )
-            if pos < end and not nxt:
-                nxt = set(x for c in curr for x in (self.graph[c] & allowed) - visited)
-                # low = min(len(self.graph[x] & allowed - visited) for x in nxt) if nxt else 0
-                # nxt = set(x for x in nxt if len(self.graph[x] & allowed - visited) == low)
-        # if pos < end:
-        #     nxt = set(x for c in curr for x in (self.graph[c] & allowed) - visited)
-        if len(nxt) < end - beg:
-            nxt |= curr
-        return nxt
+            nxt = set(x for c in curr for x in self.graph[c] & allowed - visited)
+            turn += 1
+        centers = nxt | curr if extra else nxt
+        print(f"Path {size=} short:{size // 2 - turn} visited:{len(visited)} {start=} {last=} width:{extra + 1} {centers=}")
+        return centers
 
     def prune_for_centers(self, leafs, allowed: set[int]) -> (tuple[int], tuple[str]):
         """Using the pruning method to find centers and labels."""
@@ -297,7 +289,7 @@ class Tree:
             # path = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
         beg = end - 2 + dia % 2
-        mids = path[beg:end] if path else self.prune_path_center({a, b}, beg, end, visited & self.members)
+        mids = path[beg:end] if path else self.prune_path_center(a, b, dia, visited)
         ah_mids = [self.ahu_height(mid, None) for mid in mids]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
@@ -382,6 +374,15 @@ def jennysSubtrees(n, r, edges):
     nl = f"NoLabel={len(NOLABEL)}"
     total = len(MISMATCH | OVERCENTER | NOLABEL)
     print(f"Label Errors: {total=} {oc} {mm} {nl}")
+    mid_cnt = Counter(len(ea) for ea in PATHCENTERS)
+    mid_cnt['GOOD'] = mid_cnt[1] + mid_cnt[2]
+    del mid_cnt[1]
+    del mid_cnt[2]
+    print(f"Path Centers {mid_cnt.items()}")
+    for ea in PATHCENTERS:
+        if 0 < len(ea) < 3:
+            continue
+        print(f"  {ea}")
     for centers, paths in OVERCENTER:
         print(f"{centers} :: {paths}")
     for tree, members in NOLABEL:
