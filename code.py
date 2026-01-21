@@ -162,7 +162,7 @@ class Tree:
     def get_paths(self, ends: set[int]) -> list[list[int]]:
         print("Called get_paths")
         if self.radius == 0:
-            return [[self.origin], ]
+            return [[ea] for ea in ends]
         paths = (self._get_path(a, b, None, self.members) for a, b in combinations(ends, 2))
         return list(filter(None, paths))
 
