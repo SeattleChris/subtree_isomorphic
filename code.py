@@ -49,21 +49,15 @@ class Tree:
     def centers(self) -> tuple[int]:
         if not self._centers:
             path = None
-            # path = self.make_long_path(self.paths)
-            # if (diff := self.radius - self.depth):
-            #     print(f"Shallow by {diff} on tree rooted at {self.origin}")
-            # if len(self.farthest) < 2:
-            #     print(f"Only one farthest leaf {self.farthest} on tree rooted at {self.origin}")
-            #     pass
-            # elif self.paths:  # and self.radius == self.depth:
-            #     path = self.make_long_path(self.paths)
-            # elif 1 < len(self.farthest) < 3:
-            #     highest = 2 * min(self.radius, self.depth) + 1
-            #     paths = self.get_paths(self.farthest)
-            #     size = max(len(p) for p in paths)
-            #     diff = highest - size
-            #     if diff <= 1:
-            #         path = next(p for p in paths if len(p) == size)
+            if self.radius == self.depth > len(self.leaf_paths) ** 2:
+                print(f"Make Long Path from {len(self.leaf_paths)} leaf paths")
+                path = self.make_long_path(self.paths)
+            elif 1 < len(self.farthest) < 3:
+                highest = 2 * min(self.radius, self.depth) + 1
+                paths = self.get_paths(self.farthest)
+                size = max(len(p) for p in paths)
+                if highest - size <= 1:
+                    path = next(p for p in paths if len(p) == size)
             self._centers, self._labels = self.diameter_centers(path)
             # self._centers, self._labels = self.prune_for_centers()
             # self._centers, self._labels = self.all_path_centers()
