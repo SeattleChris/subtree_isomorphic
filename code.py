@@ -1,13 +1,14 @@
 #!/bin/python3
 
 import os
-from collections import defaultdict
-from itertools import combinations
+from collections import defaultdict, Counter
+from itertools import combinations, chain
 from typing import Iterable
 
 MISMATCH = set()
 NOLABEL = set()
 OVERCENTER = set()
+PATHCENTERS: list[set[int]] = []
 
 def find_loop(curr, parent, visited, graph):
     if curr in visited:
@@ -48,21 +49,15 @@ class Tree:
     def centers(self) -> tuple[int]:
         if not self._centers:
             path = None
-            # path = self.make_long_path(self.paths)
-            # if (diff := self.radius - self.depth):
-            #     print(f"Shallow by {diff} on tree rooted at {self.origin}")
-            # if len(self.farthest) < 2:
-            #     print(f"Only one farthest leaf {self.farthest} on tree rooted at {self.origin}")
-            #     pass
-            # elif self.paths:  # and self.radius == self.depth:
-            #     path = self.make_long_path(self.paths)
-            # elif 1 < len(self.farthest) < 3:
-            #     highest = 2 * min(self.radius, self.depth) + 1
-            #     paths = self.get_paths(self.farthest)
-            #     size = max(len(p) for p in paths)
-            #     diff = highest - size
-            #     if diff <= 1:
-            #         path = next(p for p in paths if len(p) == size)
+            if self.radius == self.depth > len(self.leaf_paths) ** 2:
+                print(f"Make Long Path from {len(self.leaf_paths)} leaf paths")
+                path = self.make_long_path(self.paths)
+            elif 1 < len(self.farthest) < 3:
+                highest = 2 * min(self.radius, self.depth) + 1
+                paths = self.get_paths(self.farthest)
+                size = max(len(p) for p in paths)
+                if highest - size <= 1:
+                    path = next(p for p in paths if len(p) == size)
             self._centers, self._labels = self.diameter_centers(path)
             # self._centers, self._labels = self.prune_for_centers()
             # self._centers, self._labels = self.all_path_centers()
@@ -161,7 +156,7 @@ class Tree:
     def get_paths(self, ends: set[int]) -> list[list[int]]:
         print("Called get_paths")
         if self.radius == 0:
-            return [[self.origin], ]
+            return [[ea] for ea in ends]
         paths = (self._get_path(a, b, None, self.members) for a, b in combinations(ends, 2))
         return list(filter(None, paths))
 
@@ -175,7 +170,20 @@ class Tree:
             print(f"Prune Paths: {paths} for centers {tuple(mids)}")
         return paths
 
-    def prune_for_centers(self) -> (tuple[int], tuple[str]):
+    def prune_path_center(self, start: int, last: int, size: int, allowed: set[int]) -> set[int]:
+        """Using the pruning method to find center for single path."""
+        visited, seen = set(), set()
+        nxt, end = {start, }, {last, }
+        for _ in range(size // 2):
+            visited |= nxt
+            seen |= end
+            nxt = set(x for c in nxt for x in self.graph[c] & allowed - visited)
+            end = set(x for c in end for x in self.graph[c] & allowed - seen)
+        centers = nxt & end if size % 2 else nxt & seen | end & visited
+        PATHCENTERS.append(tuple(centers))
+        return centers
+
+    def prune_for_centers(self, leafs, allowed: set[int]) -> (tuple[int], tuple[str]):
         """Using the pruning method to find centers and labels."""
         visited = curr = nxt = leafs
         while len(visited | nxt) < len(allowed):
@@ -267,17 +275,19 @@ class Tree:
         """Finds two furthest leafs, finds center(s) from center of that single path."""
         dia = len(path) if path else -1
         if not path:
+            # print("No path")
             _, a, _ = self.furthest_leaf(tuple(self.farthest)[-1])
             dia, b, visited = self.furthest_leaf(a)
-            path = self._get_path(a, b, None, visited)
+            # path = self._get_path(a, b, None, visited)
         end = 1 + dia // 2
         beg = end - 2 + dia % 2
-        mids = path[beg:end] if path else self.prune_path_center({a, b}, beg, end, visited & self.members)
+        mids = path[beg:end] if path else self.prune_path_center(a, b, dia, visited)
         ah_mids = [self.ahu_height(mid, None) for mid in mids]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
         _centers = tuple(c for ahu, c in ahu_centers)
         _labels = tuple(ahu for ahu, c in ahu_centers)
+        # print(f"{self.radius - self.depth} {dia} {path[0]} to {path[-1]}: {_centers}")
         if len(_centers) > 2:
             def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
             OVERCENTER.add((
@@ -356,6 +366,15 @@ def jennysSubtrees(n, r, edges):
     nl = f"NoLabel={len(NOLABEL)}"
     total = len(MISMATCH | OVERCENTER | NOLABEL)
     print(f"Label Errors: {total=} {oc} {mm} {nl}")
+    mid_cnt = Counter(len(ea) for ea in PATHCENTERS)
+    mid_cnt['GOOD'] = mid_cnt[1] + mid_cnt[2]
+    del mid_cnt[1]
+    del mid_cnt[2]
+    print(f"Path Centers {mid_cnt.items()}")
+    for ea in PATHCENTERS:
+        if 0 < len(ea) < 3:
+            continue
+        print(f"  {ea}")
     for centers, paths in OVERCENTER:
         print(f"{centers} :: {paths}")
     for tree, members in NOLABEL:
