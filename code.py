@@ -272,16 +272,16 @@ class Tree:
         return size, last.pop(), visited
 
     def diameter_centers(self, path=None) -> (tuple[int], tuple[str]):
-        """Finds two furthest leafs, finds center(s) from center of that single path."""
-        dia = len(path) if path else -1
-        if not path:
-            # print("No path")
+        """Find center(s) from given longest path or from two furthest leafs."""
+        if path:
+            dia = len(path)
+            end = 1 + dia // 2
+            beg = end - 2 + dia % 2
+            mids = path[beg:end]
+        else:
             _, a, _ = self.furthest_leaf(tuple(self.farthest)[-1])
             dia, b, visited = self.furthest_leaf(a)
-            # path = self._get_path(a, b, None, visited)
-        end = 1 + dia // 2
-        beg = end - 2 + dia % 2
-        mids = path[beg:end] if path else self.prune_path_center(a, b, dia, visited)
+            mids = self.prune_path_center(a, b, dia, visited)
         ah_mids = [self.ahu_height(mid, None) for mid in mids]
         lo = min(h for a, h, m in ah_mids)
         ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
