@@ -229,35 +229,20 @@ class Tree:
                 ))
         return [_centers, _labels]
 
-    def make_long_path(self, paths: list[list[int]]) -> list[int]:
-        """Combines two origin to leaf paths into one longer path, if possible."""
+    def easy_long_path(self, paths: list[list[int]]) -> list[int]:
+        """Combines two origin to leaf paths into one longest path, if possible."""
         if len(paths) == 1:
             return paths[0]
         depth = min(self.radius, self.depth)
         best = [p for p in paths if len(p) == depth + 1]
         size = 2 * depth + 1
+        while len(best) < 2:
+            best += [p for p in paths if len(p) == depth]
+            depth -= 1
+            size -= 1
         long_max = (a[:0:-1] + b for a, b in combinations(best, 2) if len(set(a + b)) == size)
         res = next(long_max, [])
         return res
-        # long = 0
-        # results = []
-        # paths = best + [p for p in paths if len(p) < depth + 1]
-        # start = len(best) - 1
-        # for idx, p in enumerate(paths[: -1], 1):
-        #     if long == size:
-        #         break
-        #     lp, sp = len(p), set(p)
-        #     found = [
-        #         p[:pos:-1] + h[pos:]
-        #         for h in paths[max(idx, start):]
-        #         if len(sp ^ set(h)) >= long
-        #         and (pos := lp + len(h) - 1 - len(sp | set(h))) < len(h)
-        #         ]
-        #     top = max(len(f) for f in found) if found else 0
-        #     results.extend(f for f in found if len(f) == top)
-        #     long = max(long, top)
-        # res = next((p for p in results[::-1] if len(p) == long), [])
-        # return res
 
     def furthest_leaf(self, start: int) -> (int, int, set[int]):
         """In case of multiple furthest leafs, any arbitrary one will do."""
