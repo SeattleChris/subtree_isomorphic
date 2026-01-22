@@ -228,6 +228,8 @@ class Tree:
 
     def easy_long_path(self, paths: list[list[int]]) -> list[int]:
         """Combines two origin to leaf paths into one longest path, if possible."""
+        if not paths:
+            return []
         if len(paths) == 1:
             return paths[0]
         depth = min(self.radius, self.depth)
@@ -240,6 +242,13 @@ class Tree:
         long_max = (a[:0:-1] + b for a, b in combinations(best, 2) if len(set(a + b)) == size)
         res = next(long_max, [])
         return res
+
+    def far_leaf(self, curr: int, path: list[int], visited: set[int]) -> list[int]:
+        """Find the path to the farthest leaf from given start leaf."""
+        path.append(curr)
+        visited.add(curr)
+        nxt: set[int] = self.graph[curr] & self.members - visited
+        return max((self.far_leaf(x, path[:], visited) for x in nxt), key=len, default=path)
 
     def furthest_leaf(self, start: int) -> (int, int, set[int]):
         """In case of multiple furthest leafs, any arbitrary one will do."""
@@ -255,6 +264,10 @@ class Tree:
 
     def diameter_centers(self, path=None) -> (tuple[int], tuple[str]):
         """Find center(s) from given longest path or from two furthest leafs."""
+        if not path:
+            first = self.far_leaf(tuple(self.farthest)[-1], [], set())
+            path = self.far_leaf(first[-1], [], set())
+            # print(f"Found path {path[0]} to {path[-1]} size:{len(path)}")
         if path:
             dia = len(path)
             end = 1 + dia // 2
