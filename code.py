@@ -9,6 +9,8 @@ MISMATCH = set()
 NOLABEL = set()
 OVERCENTER = set()
 PATHCENTERS: list[set[int]] = []
+TECHNIQUE = []
+
 
 def find_loop(curr, parent, visited, graph):
     if curr in visited:
@@ -48,16 +50,11 @@ class Tree:
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
-            path = None
-            if self.radius == self.depth > len(self.leaf_paths) ** 2:
-                print(f"Make Long Path from {len(self.leaf_paths)} leaf paths")
-                path = self.make_long_path(self.paths)
-            elif 1 < len(self.farthest) < 3:
-                highest = 2 * min(self.radius, self.depth) + 1
-                paths = self.get_paths(self.farthest)
-                size = max(len(p) for p in paths)
-                if highest - size <= 1:
-                    path = next(p for p in paths if len(p) == size)
+            path = self.easy_long_path(self.leaf_paths) or None
+            if path:
+                TECHNIQUE.append(('Make', self.radius, len(self.leaf_paths), len(self.paths), self.farthest))
+            else:
+                TECHNIQUE.append(('Leaf', self.radius, len(self.leaf_paths), len(self.paths), self.farthest))
             self._centers, self._labels = self.diameter_centers(path)
             # self._centers, self._labels = self.prune_for_centers()
             # self._centers, self._labels = self.all_path_centers()
@@ -67,12 +64,13 @@ class Tree:
         # b_members, b_furthest, b_dist = self.build_breadth(curr)
         dist, paths = self.build_depth(curr)
         furthest = [p[-1] for p in paths if len(p) == dist + 1]
-        if len(furthest) == 1:
-            furthest = [p[-1] for p in paths if len(p) == dist] + furthest
         members = set().union(*paths)
         self.paths = paths
-        # self.populate_paths(paths)
         self.leaf_paths = [p for p in paths if len(self.graph[p[-1]] & members) == 1]
+        if len(self.leaf_paths) > len(furthest) > 1:
+            self.leaf_paths = [p for p in self.leaf_paths if p[-1] in furthest]
+        if len(furthest) == 1:
+            furthest = [p[-1] for p in paths if len(p) == dist] + furthest
         # d_mem = len(d_members) - len(b_members)
         # d_fur = len(d_furthest & b_furthest)
         # d_dis = d_dist - b_dist
@@ -154,7 +152,6 @@ class Tree:
         return []
 
     def get_paths(self, ends: set[int]) -> list[list[int]]:
-        print("Called get_paths")
         if self.radius == 0:
             return [[ea] for ea in ends]
         paths = (self._get_path(a, b, None, self.members) for a, b in combinations(ends, 2))
@@ -366,6 +363,43 @@ def jennysSubtrees(n, r, edges):
         print(f"{members=} {tree}")
     for tree, missing in MISMATCH:
         print(f"{missing=} {tree}")
+    tech = defaultdict(list)
+    for t, r, lp, ap, f in TECHNIQUE:
+        tech[t].append((r, lp, ap, f))
+    for label in ('Make', 'Get', 'Leaf'):
+        tech.setdefault(label, [(0, 0, 0, [])])
+    num = len(tech['Make'])
+    fl = min(len(f) for r, pl, pa, f in tech['Make'])
+    fh = max(len(f) for r, pl, pa, f in tech['Make'])
+    ll = min(pl for r, pl, pa, f in tech['Make'])
+    lh = max(pl for r, pl, pa, f in tech['Make'])
+    al = min(pa for r, pl, pa, f in tech['Make'])
+    ah = max(pa for r, pl, pa, f in tech['Make'])
+    txt = f"Make:{num} far({fl} {fh}) *leaf_p({ll} {lh})* all_p({al} {ah}) "
+    num = len(tech['Get'])
+    fl = min(len(f) for r, pl, pa, f in tech['Get'])
+    fh = max(len(f) for r, pl, pa, f in tech['Get'])
+    ll = min(pl for r, pl, pa, f in tech['Get'])
+    lh = max(pl for r, pl, pa, f in tech['Get'])
+    al = min(pa for r, pl, pa, f in tech['Get'])
+    ah = max(pa for r, pl, pa, f in tech['Get'])
+    txt += f"Get:{num} far({fl} {fh}) leaf_p({ll} {lh}) *all_p({al} {ah})* "
+    num = len(tech['Leaf'])
+    fl = min(len(f) for r, pl, pa, f in tech['Leaf'])
+    fh = max(len(f) for r, pl, pa, f in tech['Leaf'])
+    ll = min(pl for r, pl, pa, f in tech['Leaf'])
+    lh = max(pl for r, pl, pa, f in tech['Leaf'])
+    al = min(pa for r, pl, pa, f in tech['Leaf'])
+    ah = max(pa for r, pl, pa, f in tech['Leaf'])
+    txt += f"Leaf:{num} *far({fl} {fh})* leaf_p({ll} {lh}) all_p({al} {ah}) "
+    print(txt)
+    for radius, p_leaf, p_all, leafs in tech['Make']:
+        print(f"   Make {p_leaf=} {leafs=}")
+    for radius, p_leaf, p_all, leafs in tech['Get']:
+        print(f"   Get {p_leaf=} {p_all=} leafs#{len(leafs)}")
+    for radius, p_leaf, p_all, leafs in tech['Leaf']:
+        print(f"   Leaf {p_leaf=} {p_all=} leafs#{len(leafs)}")
+    print(txt)
     return len(uniq)
 
 if __name__ == '__main__':
