@@ -50,36 +50,24 @@ class Tree:
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
-            path = self.easy_long_path(self.leaf_paths) or None
-            if path:
-                TECHNIQUE.append(('Make', self.radius, len(self.leaf_paths), len(self.paths), self.farthest))
-            else:
-                TECHNIQUE.append(('Leaf', self.radius, len(self.leaf_paths), len(self.paths), self.farthest))
+            # path = self.easy_long_path(self.leaf_paths) or None
+            path = None
             self._centers, self._labels = self.diameter_centers(path)
             # self._centers, self._labels = self.prune_for_centers()
             # self._centers, self._labels = self.all_path_centers()
         return self._centers
 
     def build(self, curr: int) -> (set[int], set[int], int):
-        # b_members, b_furthest, b_dist = self.build_breadth(curr)
-        dist, paths = self.build_depth(curr)
-        furthest = [p[-1] for p in paths if len(p) == dist + 1]
-        members = set().union(*paths)
-        self.paths = paths
-        self.leaf_paths = [p for p in paths if len(self.graph[p[-1]] & members) == 1]
-        if len(self.leaf_paths) > len(furthest) > 1:
-            self.leaf_paths = [p for p in self.leaf_paths if p[-1] in furthest]
-        if len(furthest) == 1:
-            furthest = [p[-1] for p in paths if len(p) == dist] + furthest
-        # d_mem = len(d_members) - len(b_members)
-        # d_fur = len(d_furthest & b_furthest)
-        # d_dis = d_dist - b_dist
-        # # o_mem = members - g_members
-        # o_fur = d_furthest - b_furthest
-        # o_fur = 'ALL' if o_fur == d_furthest else len(o_fur)
-        # m_fur = b_furthest - d_furthest
-        # m_fur = 'ALL' if m_fur == b_furthest else len(m_fur)
-        # print(f"{d_dis} mem:{d_mem} far:{d_fur} Over:{o_fur} Miss:{m_fur}")
+        members, furthest, dist = self.build_breadth(curr)
+        # dist, paths = self.build_depth(curr)
+        # furthest = [p[-1] for p in paths if len(p) == dist + 1]
+        # members = set().union(*paths)
+        # self.paths = paths
+        # self.leaf_paths = [p for p in paths if len(self.graph[p[-1]] & members) == 1]
+        # if len(self.leaf_paths) > len(furthest) > 1:
+        #     self.leaf_paths = [p for p in self.leaf_paths if p[-1] in furthest]
+        # if len(furthest) == 1:
+        #     furthest = [p[-1] for p in paths if len(p) == dist] + furthest
         return frozenset(members), furthest, dist
 
     def ahu_height(self, curr, parent) -> tuple[str, int, int]:
@@ -264,10 +252,9 @@ class Tree:
 
     def diameter_centers(self, path=None) -> (tuple[int], tuple[str]):
         """Find center(s) from given longest path or from two furthest leafs."""
-        if not path:
-            first = self.far_leaf(tuple(self.farthest)[-1], [], set())
-            path = self.far_leaf(first[-1], [], set())
-            # print(f"Found path {path[0]} to {path[-1]} size:{len(path)}")
+        # if not path:
+        #     first = self.far_leaf(tuple(self.farthest)[-1], [], set())
+        #     path = self.far_leaf(first[-1], [], set())
         if path:
             dia = len(path)
             end = 1 + dia // 2
