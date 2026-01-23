@@ -52,9 +52,13 @@ class Tree:
         if not self._centers:
             # path = self.easy_long_path(self.leaf_paths) or None
             path = None
-            self._centers, self._labels = self.diameter_centers(path)
-            # self._centers, self._labels = self.prune_for_centers()
-            # self._centers, self._labels = self.all_path_centers()
+            # mids = self.diameter_centers(path)
+            mids = self.prune_for_centers(self.leafs, self.members)
+            ah_mids = [self.ahu_height(mid, None) for mid in mids]
+            lo = min(h for a, h, m in ah_mids)
+            ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
+            self._centers = tuple(c for ahu, c in ahu_centers)
+            self._labels = tuple(ahu for ahu, c in ahu_centers)
         return self._centers
 
     def build(self, curr: int) -> (set[int], set[int], int):
@@ -181,17 +185,8 @@ class Tree:
                     for x in (self.graph[c] & allowed) - visited
                     if len(self.graph[x] & allowed - visited) < 2
                     )
-            nxt = set(x for c in curr for x in (self.graph[c] & allowed) - visited)
         # self.center_connections(curr, True)
-        ah_mids = [self.ahu_height(mid, None) for mid in nxt or curr]
-        lo = min(h for a, h, m in ah_mids)
-        ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
-        _centers = tuple(c for ahu, c in ahu_centers)
-        _labels = tuple(ahu for ahu, c in ahu_centers)
-        if len(_centers) > 2:
-            paths = tuple(filter(None, self.center_connections(set(_centers), False)))
-            OVERCENTER.add((_centers, paths))
-        return [_centers, _labels]
+        return nxt or curr
 
     def all_path_centers(self, ends=None) -> (tuple[int], tuple[str]):
         """Explores all possible leaf to leaf paths, finding centers for all longest paths."""
@@ -264,11 +259,7 @@ class Tree:
             _, a, _ = self.furthest_leaf(tuple(self.farthest)[-1])
             dia, b, visited = self.furthest_leaf(a)
             mids = self.prune_path_center(a, b, dia, visited)
-        ah_mids = [self.ahu_height(mid, None) for mid in mids]
-        lo = min(h for a, h, m in ah_mids)
-        ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
-        _centers = tuple(c for ahu, c in ahu_centers)
-        _labels = tuple(ahu for ahu, c in ahu_centers)
+        return mids
         # print(f"{self.radius - self.depth} {dia} {path[0]} to {path[-1]}: {_centers}")
         if len(_centers) > 2:
             def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
