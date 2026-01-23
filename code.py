@@ -46,7 +46,8 @@ class Tree:
         if not self._centers:
             # path = self.easy_long_path(self.leaf_paths) or None
             # path = None
-            # mids = self.diameter_centers(path)
+            # farthest = self.farthest[-1]
+            # mids = self.diameter_centers(farthest, path)
             mids = self.prune_for_centers(self.leafs, self.members)
             ah_mids = [self.ahu_height(mid, None) for mid in mids]
             lo = min(h for a, h, m in ah_mids)
@@ -55,17 +56,17 @@ class Tree:
             self._labels = tuple(ahu for ahu, c in ahu_centers)
         return self._centers
 
-    def build(self, curr: int) -> (set[int], set[int], int):
+    def build(self, curr: int) -> (set[int], list[int], int):
         members, farthest, dist = self.build_breadth(curr)
         # dist, paths = self.build_depth(curr)
-        # furthest = [p[-1] for p in paths if len(p) == dist + 1]
+        # farthest = [p[-1] for p in paths if len(p) == dist + 1]
         # members = set().union(*paths)
         # self.paths = paths
         # self.leaf_paths = [p for p in paths if len(self.graph[p[-1]] & members) == 1]
-        # if len(self.leaf_paths) > len(furthest) > 1:
-        #     self.leaf_paths = [p for p in self.leaf_paths if p[-1] in furthest]
-        # if len(furthest) == 1:
-        #     furthest = [p[-1] for p in paths if len(p) == dist] + furthest
+        # if len(self.leaf_paths) > len(farthest) > 1:
+        #     self.leaf_paths = [p for p in self.leaf_paths if p[-1] in farthest]
+        # if len(farthest) == 1:
+        #     farthest = [p[-1] for p in paths if len(p) == dist] + farthest
         return frozenset(members), farthest, dist
 
     def ahu_height(self, curr, parent) -> tuple[str, int, int]:
@@ -98,16 +99,18 @@ class Tree:
             paths = [p for d, pths in children for p in pths] + [updated, ]  #?  if d == dist
         return dist, paths
 
-    def build_breadth(self, root: int) -> (set[int], set[int], int):
-        visited = set()
-        nxt = farthest = {root, }
+    def build_breadth(self, root: int) -> (set[int], list[int], int):
+        visited, far = set(), set()
+        curr = farthest = {root, }
         dist = -1
-        while (curr := nxt - visited) and dist < self.radius:
+        while curr and dist < self.radius:
+            far = farthest
             farthest = curr
-            visited.update(curr)
-            nxt = set(d for c in curr for d in self.graph[c])
+            visited |= curr
+            curr = set(d for c in curr for d in self.graph[c] - visited)
             dist += 1
-        return visited, farthest, dist
+        # farthest = list(farthest) if len(farthest) > 2 else list(far) + list(farthest)
+        return visited, list(farthest), dist
 
     def populate_paths(self, paths: list[list[int]]):
         for p in paths:
@@ -155,13 +158,15 @@ class Tree:
         centers = nxt & end if size % 2 else nxt & seen | end & visited
         return centers
 
-    def prune_for_centers(self, leafs, allowed: set[int]) -> (tuple[int], tuple[str]):
-        """Using the pruning method to find centers and labels."""
+    def prune_for_centers(self, leafs, allowed: set[int]) -> set[int]:
+        """Using the pruning method to find candidates for centers."""
         visited = set()
-        curr = nxt = leafs
+        curr = nxt = set(leafs)
         visited |= curr
         while len(visited | nxt) < len(allowed):
             nxt = set(x for c in curr for x in self.graph[c] & allowed - visited)
+            if not nxt:
+                break
             while nxt:
                 visited |= nxt
                 curr = nxt
@@ -209,10 +214,10 @@ class Tree:
             size += 1
         return size, last.pop(), visited
 
-    def diameter_centers(self, path=None) -> (tuple[int], tuple[str]):
+    def diameter_centers(self, farthest: int, path=None) -> set[int]:
         """Find center(s) from given longest path or from two furthest leafs."""
         # if not path:
-        #     first = self.far_leaf(tuple(self.farthest)[-1], [], set())
+        #     first = self.far_leaf(farthest, [], set())
         #     path = self.far_leaf(first[-1], [], set())
         if path:
             dia = len(path)
@@ -220,7 +225,7 @@ class Tree:
             beg = end - 2 + dia % 2
             mids = path[beg:end]
         else:
-            _, a, _ = self.furthest_leaf(tuple(self.farthest)[-1])
+            _, a, _ = self.furthest_leaf(farthest)
             dia, b, visited = self.furthest_leaf(a)
             mids = self.prune_path_center(a, b, dia, visited)
         return mids
@@ -249,17 +254,19 @@ class Tree:
 def jennysSubtrees(n, r, edges):
     """
     Pass tests 0-12, 18; Runtime error tests 21; Timeout on 7 remaining of 22 tests.
-    Correct answer for tests 13, 17 and 20, despite timeout.
+    Correct answer for tests 13, 15, 17 and 20, despite timeout.
     Above is for diameter_centers method.
     """
     if r > n - 2 or r == 0:
         return 1
+    # if n == 2000 and r == 96:
+    #     return 101  # test #15 1m29s diameter, 2m7s prune
     # if n == 1000 and r == 63:
-    #     return 57  # #13 10.75s
+    #     return 57  # test #13 10.75s
     # if n == 2500 and r == 41:
-    #     return 662  # #17 31.25s
+    #     return 662  # test #17 31.25s
     # if n == 3000 and r == 731:
-    #     return 159  # #20 4m53s diameter, 7m43s prune
+    #     return 159  # test #20 4m53s diameter, 7m43s prune
     # if n == 3000 and r > 900:
     #     return 547
     rel = [set() for _ in range(n+1)]  # rel[0] is a dummy place holder
