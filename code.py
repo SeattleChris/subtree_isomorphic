@@ -46,7 +46,8 @@ class Tree:
         if not self._centers:
             # path = self.easy_long_path(self.leaf_paths) or None
             # path = None
-            # mids = self.diameter_centers(path)
+            # farthest = tuple(self.farthest)[-1]
+            # mids = self.diameter_centers(farthest, path)
             mids = self.prune_for_centers(self.leafs, self.members)
             ah_mids = [self.ahu_height(mid, None) for mid in mids]
             lo = min(h for a, h, m in ah_mids)
@@ -58,14 +59,14 @@ class Tree:
     def build(self, curr: int) -> (set[int], set[int], int):
         members, farthest, dist = self.build_breadth(curr)
         # dist, paths = self.build_depth(curr)
-        # furthest = [p[-1] for p in paths if len(p) == dist + 1]
+        # farthest = [p[-1] for p in paths if len(p) == dist + 1]
         # members = set().union(*paths)
         # self.paths = paths
         # self.leaf_paths = [p for p in paths if len(self.graph[p[-1]] & members) == 1]
-        # if len(self.leaf_paths) > len(furthest) > 1:
-        #     self.leaf_paths = [p for p in self.leaf_paths if p[-1] in furthest]
-        # if len(furthest) == 1:
-        #     furthest = [p[-1] for p in paths if len(p) == dist] + furthest
+        # if len(self.leaf_paths) > len(farthest) > 1:
+        #     self.leaf_paths = [p for p in self.leaf_paths if p[-1] in farthest]
+        # if len(farthest) == 1:
+        #     farthest = [p[-1] for p in paths if len(p) == dist] + farthest
         return frozenset(members), farthest, dist
 
     def ahu_height(self, curr, parent) -> tuple[str, int, int]:
@@ -209,10 +210,10 @@ class Tree:
             size += 1
         return size, last.pop(), visited
 
-    def diameter_centers(self, path=None) -> (tuple[int], tuple[str]):
+    def diameter_centers(self, farthest: int, path=None) -> (tuple[int], tuple[str]):
         """Find center(s) from given longest path or from two furthest leafs."""
         # if not path:
-        #     first = self.far_leaf(tuple(self.farthest)[-1], [], set())
+        #     first = self.far_leaf(farthest, [], set())
         #     path = self.far_leaf(first[-1], [], set())
         if path:
             dia = len(path)
@@ -220,7 +221,7 @@ class Tree:
             beg = end - 2 + dia % 2
             mids = path[beg:end]
         else:
-            _, a, _ = self.furthest_leaf(tuple(self.farthest)[-1])
+            _, a, _ = self.furthest_leaf(farthest)
             dia, b, visited = self.furthest_leaf(a)
             mids = self.prune_path_center(a, b, dia, visited)
         return mids
