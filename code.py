@@ -1,15 +1,9 @@
 #!/bin/python3
 
 import os
-from collections import defaultdict, Counter
-from itertools import combinations, chain
+from collections import defaultdict
+from itertools import combinations
 from typing import Iterable
-
-MISMATCH = set()
-NOLABEL = set()
-OVERCENTER = set()
-PATHCENTERS: list[set[int]] = []
-TECHNIQUE = []
 
 
 def find_loop(curr, parent, visited, graph):
@@ -51,7 +45,7 @@ class Tree:
     def centers(self) -> tuple[int]:
         if not self._centers:
             # path = self.easy_long_path(self.leaf_paths) or None
-            path = None
+            # path = None
             # mids = self.diameter_centers(path)
             mids = self.prune_for_centers(self.leafs, self.members)
             ah_mids = [self.ahu_height(mid, None) for mid in mids]
@@ -149,16 +143,6 @@ class Tree:
         paths = (self._get_path(a, b, None, self.members) for a, b in combinations(ends, 2))
         return list(filter(None, paths))
 
-    def center_connections(self, mids: set[int], display: bool = False) -> tuple[tuple[int]]:
-        if len(mids) < 2:
-            return tuple()
-        paths = tuple(tuple(p) for p in self.get_paths(mids))
-        if len(paths) == 1 and set(paths[0]) == mids:
-            return tuple()
-        if display:
-            print(f"Prune Paths: {paths} for centers {tuple(mids)}")
-        return paths
-
     def prune_path_center(self, start: int, last: int, size: int, allowed: set[int]) -> set[int]:
         """Using the pruning method to find center for single path."""
         visited, seen = set(), set()
@@ -169,7 +153,6 @@ class Tree:
             nxt = set(x for c in nxt for x in self.graph[c] & allowed - visited)
             end = set(x for c in end for x in self.graph[c] & allowed - seen)
         centers = nxt & end if size % 2 else nxt & seen | end & visited
-        PATHCENTERS.append(tuple(centers))
         return centers
 
     def prune_for_centers(self, leafs, allowed: set[int]) -> (tuple[int], tuple[str]):
@@ -188,29 +171,7 @@ class Tree:
                     for x in (self.graph[c] & allowed) - visited
                     if len(self.graph[x] & allowed - visited) < 2
                     )
-        # self.center_connections(curr, True)
         return nxt or curr
-
-    def all_path_centers(self, ends=None) -> (tuple[int], tuple[str]):
-        """Explores all possible leaf to leaf paths, finding centers for all longest paths."""
-        ends = ends or self.leafs
-        paths = self.get_paths(ends)
-        size = max(len(p) for p in paths)
-        end = 1 + size // 2
-        beg = end - 2 + size % 2
-        mids = set(d for p in paths for d in p[beg:end] if len(p) == size)  # Remove redundant
-        ah_mids = [self.ahu_height(mid, None) for mid in mids]
-        lo = min(h for a, h, m in ah_mids)
-        ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
-        _centers = tuple(c for ahu, c in ahu_centers)
-        _labels = tuple(ahu for ahu, c in ahu_centers)
-        if len(_centers) > 2:
-            def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
-            OVERCENTER.add((
-                tuple(_centers),
-                tuple(_summary(p) for p in paths if len(p) == size)
-                ))
-        return [_centers, _labels]
 
     def easy_long_path(self, paths: list[list[int]]) -> list[int]:
         """Combines two origin to leaf paths into one longest path, if possible."""
@@ -263,14 +224,6 @@ class Tree:
             dia, b, visited = self.furthest_leaf(a)
             mids = self.prune_path_center(a, b, dia, visited)
         return mids
-        # print(f"{self.radius - self.depth} {dia} {path[0]} to {path[-1]}: {_centers}")
-        if len(_centers) > 2:
-            def _summary(p): return tuple(p[:2] + ['x'] + p[beg-1:end+1] + ['x'] + p[-2:])
-            OVERCENTER.add((
-                tuple(_centers),
-                tuple(_summary(p) for p in path or [])
-                ))
-        return [_centers, _labels]
 
     def __eq__(self, other):
         if not isinstance(other, Tree):
@@ -283,14 +236,6 @@ class Tree:
         for desc in self.labels:
             if desc in other.labels:
                 return True
-        if not self._labels:
-            NOLABEL.add((str(self), len(self.members)))
-        elif (slb := len(self.members) - (len(self.labels[0]) // 2)):
-            MISMATCH.add((str(self), slb))
-        if not other._labels:
-            NOLABEL.add((str(other), len(other.members)))
-        elif (olb := len(other.members) - (len(other.labels[0]) // 2)):
-            MISMATCH.add((str(other), olb))
         return False
 
     def __repr__(self):
@@ -317,83 +262,12 @@ def jennysSubtrees(n, r, edges):
     for idx, pos in edges:
         rel[idx].add(pos)
         rel[pos].add(idx)
-    # #####################
-    # visited = set()
-    # nxt = last = {n, }
-    # size = 0
-    # while (curr := nxt - visited):
-    #     last = curr
-    #     visited.update(curr)
-    #     nxt = set(d for c in curr for d in rel[c])
-    #     size += 1
-    # far = last.pop()
-    # loop = find_loop(far, None, set(), rel)
-    # print("Loop detected:", loop)
-    # ############
     seq = (group for group in rel)
     trees = [Tree(idx, r, seq) for idx in range(1, n + 1)]
-    # uniq = set(trees)
     uniq = []
     for tree in trees:
         if tree not in uniq:
             uniq.append(tree)
-    mm = f"Mismatch={len(MISMATCH)}"
-    oc = f"OverCenter={len(OVERCENTER)}"
-    nl = f"NoLabel={len(NOLABEL)}"
-    total = len(MISMATCH | OVERCENTER | NOLABEL)
-    print(f"Label Errors: {total=} {oc} {mm} {nl}")
-    mid_cnt = Counter(len(ea) for ea in PATHCENTERS)
-    mid_cnt['GOOD'] = mid_cnt[1] + mid_cnt[2]
-    del mid_cnt[1]
-    del mid_cnt[2]
-    print(f"Path Centers {mid_cnt.items()}")
-    for ea in PATHCENTERS:
-        if 0 < len(ea) < 3:
-            continue
-        print(f"  {ea}")
-    for centers, paths in OVERCENTER:
-        print(f"{centers} :: {paths}")
-    for tree, members in NOLABEL:
-        print(f"{members=} {tree}")
-    for tree, missing in MISMATCH:
-        print(f"{missing=} {tree}")
-    tech = defaultdict(list)
-    for t, r, lp, ap, f in TECHNIQUE:
-        tech[t].append((r, lp, ap, f))
-    for label in ('Make', 'Get', 'Leaf'):
-        tech.setdefault(label, [(0, 0, 0, [])])
-    num = len(tech['Make'])
-    fl = min(len(f) for r, pl, pa, f in tech['Make'])
-    fh = max(len(f) for r, pl, pa, f in tech['Make'])
-    ll = min(pl for r, pl, pa, f in tech['Make'])
-    lh = max(pl for r, pl, pa, f in tech['Make'])
-    al = min(pa for r, pl, pa, f in tech['Make'])
-    ah = max(pa for r, pl, pa, f in tech['Make'])
-    txt = f"Make:{num} far({fl} {fh}) *leaf_p({ll} {lh})* all_p({al} {ah}) "
-    num = len(tech['Get'])
-    fl = min(len(f) for r, pl, pa, f in tech['Get'])
-    fh = max(len(f) for r, pl, pa, f in tech['Get'])
-    ll = min(pl for r, pl, pa, f in tech['Get'])
-    lh = max(pl for r, pl, pa, f in tech['Get'])
-    al = min(pa for r, pl, pa, f in tech['Get'])
-    ah = max(pa for r, pl, pa, f in tech['Get'])
-    txt += f"Get:{num} far({fl} {fh}) leaf_p({ll} {lh}) *all_p({al} {ah})* "
-    num = len(tech['Leaf'])
-    fl = min(len(f) for r, pl, pa, f in tech['Leaf'])
-    fh = max(len(f) for r, pl, pa, f in tech['Leaf'])
-    ll = min(pl for r, pl, pa, f in tech['Leaf'])
-    lh = max(pl for r, pl, pa, f in tech['Leaf'])
-    al = min(pa for r, pl, pa, f in tech['Leaf'])
-    ah = max(pa for r, pl, pa, f in tech['Leaf'])
-    txt += f"Leaf:{num} *far({fl} {fh})* leaf_p({ll} {lh}) all_p({al} {ah}) "
-    print(txt)
-    for radius, p_leaf, p_all, leafs in tech['Make']:
-        print(f"   Make {p_leaf=} {leafs=}")
-    for radius, p_leaf, p_all, leafs in tech['Get']:
-        print(f"   Get {p_leaf=} {p_all=} leafs#{len(leafs)}")
-    for radius, p_leaf, p_all, leafs in tech['Leaf']:
-        print(f"   Leaf {p_leaf=} {p_all=} leafs#{len(leafs)}")
-    print(txt)
     return len(uniq)
 
 if __name__ == '__main__':
