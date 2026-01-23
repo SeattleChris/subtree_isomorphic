@@ -174,11 +174,14 @@ class Tree:
 
     def prune_for_centers(self, leafs, allowed: set[int]) -> (tuple[int], tuple[str]):
         """Using the pruning method to find centers and labels."""
-        visited = curr = nxt = leafs
+        visited = set()
+        curr = nxt = leafs
+        visited |= curr
         while len(visited | nxt) < len(allowed):
+            nxt = set(x for c in curr for x in self.graph[c] & allowed - visited)
             while nxt:
+                visited |= nxt
                 curr = nxt
-                visited |= curr
                 nxt = set(
                     x
                     for c in curr
