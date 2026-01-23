@@ -27,9 +27,9 @@ class Tree:
             self.set_graph(adjacency)
         self.paths: list[list[int]] = []  # All paths from origin
         self.leaf_paths: list[list[int]] = []  # origin to leaf paths
-        members, furthest, dist = self.build(root)
+        members, farthest, dist = self.build(root)
         self.members: frozenset[int] = members
-        self.farthest: list[int] = furthest
+        self.farthest: list[int] = farthest
         self.depth: int = dist
         self._degree: dict[int, int] = None
         self._centers: tuple[int] = None
@@ -56,7 +56,7 @@ class Tree:
         return self._centers
 
     def build(self, curr: int) -> (set[int], set[int], int):
-        members, furthest, dist = self.build_breadth(curr)
+        members, farthest, dist = self.build_breadth(curr)
         # dist, paths = self.build_depth(curr)
         # furthest = [p[-1] for p in paths if len(p) == dist + 1]
         # members = set().union(*paths)
@@ -66,7 +66,7 @@ class Tree:
         #     self.leaf_paths = [p for p in self.leaf_paths if p[-1] in furthest]
         # if len(furthest) == 1:
         #     furthest = [p[-1] for p in paths if len(p) == dist] + furthest
-        return frozenset(members), furthest, dist
+        return frozenset(members), farthest, dist
 
     def ahu_height(self, curr, parent) -> tuple[str, int, int]:
         children = self.graph[curr] & self.members - {parent, }
@@ -100,14 +100,14 @@ class Tree:
 
     def build_breadth(self, root: int) -> (set[int], set[int], int):
         visited = set()
-        nxt = furthest = {root, }
+        nxt = farthest = {root, }
         dist = -1
         while (curr := nxt - visited) and dist < self.radius:
-            furthest = curr
+            farthest = curr
             visited.update(curr)
             nxt = set(d for c in curr for d in self.graph[c])
             dist += 1
-        return visited, furthest, dist
+        return visited, farthest, dist
 
     def populate_paths(self, paths: list[list[int]]):
         for p in paths:
