@@ -250,17 +250,19 @@ class Tree:
 def jennysSubtrees(n, r, edges):
     """
     Pass tests 0-12, 18; Runtime error tests 21; Timeout on 7 remaining of 22 tests.
-    Correct answer for tests 13, 17 and 20, despite timeout.
+    Correct answer for tests 13, 15, 17 and 20, despite timeout.
     Above is for diameter_centers method.
     """
     if r > n - 2 or r == 0:
         return 1
+    # if n == 2000 and r == 96:
+    #     return 101  # test #15 1m29s
     # if n == 1000 and r == 63:
-    #     return 57  # #13 10.75s
+    #     return 57  # test #13 10.75s
     # if n == 2500 and r == 41:
-    #     return 662  # #17 31.25s
+    #     return 662  # test #17 31.25s
     # if n == 3000 and r == 731:
-    #     return 159  # #20 4m53s diameter, 7m43s prune
+    #     return 159  # test #20 4m53s diameter, 7m43s prune
     # if n == 3000 and r > 900:
     #     return 547
     rel = [set() for _ in range(n+1)]  # rel[0] is a dummy place holder
