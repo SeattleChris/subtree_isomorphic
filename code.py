@@ -34,12 +34,14 @@ class Tree:
 
     @property
     def labels(self) -> tuple[str]:
+        """Unique Graph Identifier, based on ahu algorithm (depending on center point)."""
         if not self._labels:
             self.centers # Trigger center and label calculation
         return self._labels
 
     @property
     def centers(self) -> tuple[int]:
+        """Computes and reports graph's 1 or 2 centers (if odd or even width)."""
         if not self._centers:
             farthest = self.farthest[-1]
             mids = self.diameter_centers(farthest, None)
@@ -52,6 +54,7 @@ class Tree:
         return self._centers
 
     def build(self, curr: int) -> (set[int], list[int], int):
+        """Determines members and far leaves, also reporting depth achieved towards radius."""
         members, farthest, dist = self.build_breadth(curr)
         # dist, paths = self.build_depth(curr)
         # farthest = [p[-1] for p in paths if len(p) == dist + 1]
@@ -65,6 +68,7 @@ class Tree:
         return frozenset(members), farthest, dist
 
     def ahu_height(self, curr, parent) -> tuple[str, int, int]:
+        """Unique graph representation (depending on center point) for precise differentiation."""
         children = self.graph[curr] & self.members - {parent, }
         if not children:
             return '10', 1, curr
@@ -73,6 +77,7 @@ class Tree:
 
     @property
     def degree(self) -> dict:
+        """Graph information that may simply indicate a distinction from another graph."""
         if not self._degree:
             degree = defaultdict(set)
             for d in self.members:
@@ -83,9 +88,11 @@ class Tree:
 
     @property
     def leafs(self) -> set[int]:
+        """All leafs of this instance. Depends on the 'degree' property."""
         return frozenset(self.degree[1])
 
     def build_depth(self, curr: int, dist=0, path: list[int] = None) -> (int, list[list[int]]):
+        """Recursively determine all graph members, also returning their paths from origin."""
         updated = (path or []) + [curr]
         paths: list[list[int]] = [updated, ]
         if dist < self.radius and (nxt := self.graph[curr] - set(path or [])):
@@ -108,12 +115,13 @@ class Tree:
 
     @classmethod
     def set_graph(cls, adjacency: list[set[int]]):
+        """All instances will have the same parent graph, but with different origin and members."""
         if hasattr(cls, 'graph') or not adjacency:
             return None
         cls.graph = list(adjacency)
 
     def prune_for_centers(self, leafs, allowed: set[int]) -> set[int]:
-        """Using the pruning method to find candidates for centers."""
+        """Using the pruning method to find the graph's center(s)."""
         visited = set()
         curr = nxt = set(leafs)
         visited |= curr
@@ -181,7 +189,7 @@ class Tree:
         return size, last.pop(), visited
 
     def diameter_centers(self, far: int, path=None) -> set[int]:
-        """Find center(s) from given longest path, or middle of given to furthest leaf."""
+        """Find center(s) from given longest path, or middle of given leaf to furthest leaf."""
         if path:
             dia = len(path)
             end = 1 + dia // 2
