@@ -17,7 +17,6 @@ def find_loop(curr, parent, visited, graph):
 
 
 class Tree:
-    PATHS: dict[tuple[int, int], list[int]] = {}
     graph: list[set[int]]
 
     def __init__(self, root: int, radius: int, adjacency: Iterable[set[int]] = None):
@@ -25,8 +24,6 @@ class Tree:
         self.radius: int = radius
         if not hasattr(self, 'graph'):
             self.set_graph(adjacency)
-        self.paths: list[list[int]] = []  # All paths from origin
-        self.leaf_paths: list[list[int]] = []  # origin to leaf paths
         members, farthest, dist = self.build(root)
         self.members: frozenset[int] = members
         self.farthest: list[int] = farthest
@@ -44,11 +41,9 @@ class Tree:
     @property
     def centers(self) -> tuple[int]:
         if not self._centers:
-            # path = self.easy_long_path(self.leaf_paths) or None
-            # path = None
-            # farthest = self.farthest[-1]
-            # mids = self.diameter_centers(farthest, path)
-            mids = self.prune_for_centers(self.leafs, self.members)
+            farthest = self.farthest[-1]
+            mids = self.diameter_centers(farthest, None)
+            # mids = self.prune_for_centers(self.leafs, self.members)
             ah_mids = [self.ahu_height(mid, None) for mid in mids]
             lo = min(h for a, h, m in ah_mids)
             ahu_centers = sorted((a, m) for a, h, m in ah_mids if h == lo)
@@ -100,63 +95,22 @@ class Tree:
         return dist, paths
 
     def build_breadth(self, root: int) -> (set[int], list[int], int):
-        visited, far = set(), set()
+        """Quickly determines all members of the graph, but not returning any path knowledge."""
+        visited = set()
         curr = farthest = {root, }
         dist = -1
         while curr and dist < self.radius:
-            far = farthest
             farthest = curr
             visited |= curr
             curr = set(d for c in curr for d in self.graph[c] - visited)
             dist += 1
-        # farthest = list(farthest) if len(farthest) > 2 else list(far) + list(farthest)
         return visited, list(farthest), dist
-
-    def populate_paths(self, paths: list[list[int]]):
-        for p in paths:
-            if len(p) > 1:
-                self.PATHS[(p[0], p[-1])] = p
-                self.PATHS[(p[-1], p[0])] = p[::-1]
 
     @classmethod
     def set_graph(cls, adjacency: list[set[int]]):
         if hasattr(cls, 'graph') or not adjacency:
             return None
         cls.graph = list(adjacency)
-        cls.PATHS: dict[tuple[int, int], list[int]] = {}
-
-    @classmethod
-    def _get_path(cls, curr: int, end: int, prev: int, allowed: set[int]) -> list[int]:
-        if curr == end:
-            return [curr]
-        allow_now = allowed - {prev, }
-        if (found := cls.PATHS.get((curr, end), None)) and not set(found) - allow_now:
-            return found
-        nxt = cls.graph[curr] & allow_now
-        for found in filter(None, (cls._get_path(d, end, curr, allowed) for d in nxt)):
-            # Either None, or max one possible 'found' path in a valid tree
-            cls.PATHS[(curr, end)] = (path := [curr] + found)
-            cls.PATHS[(end, curr)] = path[::-1]
-            return path
-        return []
-
-    def get_paths(self, ends: set[int]) -> list[list[int]]:
-        if self.radius == 0:
-            return [[ea] for ea in ends]
-        paths = (self._get_path(a, b, None, self.members) for a, b in combinations(ends, 2))
-        return list(filter(None, paths))
-
-    def prune_path_center(self, start: int, last: int, size: int, allowed: set[int]) -> set[int]:
-        """Using the pruning method to find center for single path."""
-        visited, seen = set(), set()
-        nxt, end = {start, }, {last, }
-        for _ in range(size // 2):
-            visited |= nxt
-            seen |= end
-            nxt = set(x for c in nxt for x in self.graph[c] & allowed - visited)
-            end = set(x for c in end for x in self.graph[c] & allowed - seen)
-        centers = nxt & end if size % 2 else nxt & seen | end & visited
-        return centers
 
     def prune_for_centers(self, leafs, allowed: set[int]) -> set[int]:
         """Using the pruning method to find candidates for centers."""
@@ -178,6 +132,18 @@ class Tree:
                     )
         return nxt or curr
 
+    def center_of_leafs(self, start: int, last: int, size: int, allowed: set[int]) -> set[int]:
+        """Finds what would be the center(s) in the path between distal leafs, using pruning."""
+        visited, seen = set(), set()
+        nxt, end = {start, }, {last, }
+        for _ in range(size // 2):
+            visited |= nxt
+            seen |= end
+            nxt = set(x for c in nxt for x in self.graph[c] & allowed - visited)
+            end = set(x for c in end for x in self.graph[c] & allowed - seen)
+        centers = nxt & end if size % 2 else nxt & seen | end & visited
+        return centers
+
     def easy_long_path(self, paths: list[list[int]]) -> list[int]:
         """Combines two origin to leaf paths into one longest path, if possible."""
         if not paths:
@@ -196,7 +162,7 @@ class Tree:
         return res
 
     def far_leaf(self, curr: int, path: list[int], visited: set[int]) -> list[int]:
-        """Find the path to the farthest leaf from given start leaf."""
+        """Find the path to the farthest leaf from given start leaf. Less efficient process."""
         path.append(curr)
         visited.add(curr)
         nxt: set[int] = self.graph[curr] & self.members - visited
@@ -214,21 +180,16 @@ class Tree:
             size += 1
         return size, last.pop(), visited
 
-    def diameter_centers(self, farthest: int, path=None) -> set[int]:
-        """Find center(s) from given longest path or from two furthest leafs."""
-        # if not path:
-        #     first = self.far_leaf(farthest, [], set())
-        #     path = self.far_leaf(first[-1], [], set())
+    def diameter_centers(self, far: int, path=None) -> set[int]:
+        """Find center(s) from given longest path, or middle of given to furthest leaf."""
         if path:
             dia = len(path)
             end = 1 + dia // 2
             beg = end - 2 + dia % 2
-            mids = path[beg:end]
-        else:
-            _, a, _ = self.furthest_leaf(farthest)
-            dia, b, visited = self.furthest_leaf(a)
-            mids = self.prune_path_center(a, b, dia, visited)
-        return mids
+            return path[beg:end]
+        _, a, _ = self.furthest_leaf(far)
+        dia, b, visited = self.furthest_leaf(a)
+        return self.center_of_leafs(a, b, dia, visited)
 
     def __eq__(self, other):
         if not isinstance(other, Tree):
@@ -246,9 +207,6 @@ class Tree:
     def __repr__(self):
         info = f"{len(self.members)}_count" if self._labels is None else self._labels[0]
         return f"<T:{info}>"
-
-    # def __hash__(self):
-    #     return hash(bin(int(self.labels[0], base=2)))
 
 
 def jennysSubtrees(n, r, edges):
